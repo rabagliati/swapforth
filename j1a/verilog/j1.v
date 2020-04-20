@@ -13,8 +13,8 @@ module j1(
 
   input  wire [`WIDTH-1:0] io_din,
 
-  output wire [12:0] code_addr,
-  input  wire [15:0] insn);
+  output wire [12:0] code_addr, // maybe seperate bank
+  input  wire [15:0] insn);     // instruction
 
   reg [3:0] dsp, dspN;          // data stack pointer
   reg [`WIDTH-1:0] st0, st0N;   // top of data stack
@@ -58,12 +58,12 @@ module j1(
       9'b0_011_?0111: st0N = {`WIDTH{(minus == 0)}};                //  =
       9'b0_011_?1000: st0N = {`WIDTH{(signedless)}};                //  <
 
-      9'b0_011_?1001: st0N = {st0[`WIDTH - 1], st0[`WIDTH - 1:1]};
-      9'b0_011_?1010: st0N = {st0[`WIDTH - 2:0], 1'b0};
-      9'b0_011_?1011: st0N = rst0;
+      9'b0_011_?1001: st0N = {st0[`WIDTH - 1], st0[`WIDTH - 1:1]};  // rshift
+      9'b0_011_?1010: st0N = {st0[`WIDTH - 2:0], 1'b0};             // lshift
+      9'b0_011_?1011: st0N = rst0;                                  // R
       9'b0_011_?1100: st0N = minus[15:0];
-      9'b0_011_?1101: st0N = io_din;
-      9'b0_011_?1110: st0N = {{(`WIDTH - 4){1'b0}}, dsp};
+      9'b0_011_?1101: st0N = io_din;                                // [T]
+      9'b0_011_?1110: st0N = {{(`WIDTH - 4){1'b0}}, dsp};           // depth
       9'b0_011_?1111: st0N = {`WIDTH{(minus[16])}};                 // u<
       default: st0N = {`WIDTH{1'bx}};
     endcase

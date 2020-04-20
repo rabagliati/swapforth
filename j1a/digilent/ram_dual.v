@@ -1,23 +1,35 @@
+module ram_dual
+#(
+    parameter MEM_INIT_FILE = "",
+    parameter LOG2ABITS = 12,   // Ultraram 4kx16
+    parameter DWIDTH = 16
+)
+(
+    output reg [DWIDTH-1:0] reada, readb,
+    input wire [DWIDTH-1:0] writea, writeb,
+    input wire [LOG2ABITS-1:0] addra, addrb,
+    input wire wea, web, clk
+);
 
-module ram_dual(q, addr_in, addr_out, d, we, clk1, clk2);
-   output[7:0] q;
-   input [7:0] d;
-   input [6:0] addr_in;
-   input [6:0] addr_out;
-   input we, clk1, clk2;
- 
-   reg [6:0] addr_out_reg;
-   reg [7:0] q;
-   reg [7:0] mem [127:0];
- 
-   always @(posedge clk1) begin
-      if (we)
-         mem[addr_in] <= d;
-   end
- 
-   always @(posedge clk2) begin
-      q <= mem[addr_out_reg];
-      addr_out_reg <= addr_out;
-   end
-        
+(* ram_init_file = "nuc.mcs" *) reg [DWIDTH-1:0] mem [0:(1<<LOG2ABITS)-1];
+
+initial begin
+    if (MEM_INIT_FILE != "") begin
+        $readmemh(MEM_INIT_FILE, ram);
+    end
+end
+
+always @(posedge clk) begin
+    if (wea)
+        mem[addra] <= writea;
+    else
+        reada <= mem[addra];
+end
+always @(posedge clk) begin
+    if (web)
+        mem[addrb] <= writeb;
+    else
+        readb <= mem[addrb];
+end
+
 endmodule
