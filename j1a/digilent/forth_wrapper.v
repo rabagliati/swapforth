@@ -11,13 +11,25 @@ module forth_wrapper
 (
 );
 
-reg clk, reset;
+reg clk=0, reset=0;
 
 wire io_rd, io_wr;
-wire [DWIDTH-1:0] addra, addrb;
+wire [LOG2ABITS-1:0] addra, addrb;
 wire wea, web;
 reg [DWIDTH-1:0] reada, readb;
 wire [DWIDTH-1:0] writea, writeb;
+
+j1 _j1(
+    .clk(clk),
+    .reset(reset),
+    .io_rd(io_rd),
+    .io_wr(io_wr),
+    .mem_wr(web),
+    .dout(writeb),
+    .io_din(readb),
+    .mem_addr(addrb),
+    .code_addr(addra),
+    .insn(reada));
 
 (* ram_init_file = "nuc.mcs" *) reg [DWIDTH-1:0] mem [0:(1<<LOG2ABITS)-1];
 
@@ -47,7 +59,8 @@ initial begin
     @(posedge clk); reset = 1;
     @(posedge clk); @(posedge clk); @(posedge clk);
     @(posedge clk); reset = 0;
-    #1000 $finish;
+    #100 $finish;
 end
 
 endmodule // top
+// vim:set shiftwidth=4 softtabstop=4 expandtab:

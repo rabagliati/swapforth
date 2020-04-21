@@ -3,7 +3,7 @@
 
 module j1(
   input wire clk,
-  input wire resetq,
+  input wire reset,
 
   output wire io_rd,
   output wire io_wr,
@@ -112,9 +112,9 @@ module j1(
     endcase
   end
 
-  always @(negedge resetq or posedge clk)
+  always @(posedge clk)
   begin
-    if (!resetq) begin
+    if (reset) begin
       reboot <= 1'b1;
       { pc, dsp, st0} <= 0;
     end else begin
