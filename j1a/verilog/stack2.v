@@ -41,3 +41,4 @@ module stack2(
 
 endmodule
 
+// vim:set shiftwidth=4 softtabstop=4 expandtab:

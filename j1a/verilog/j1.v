@@ -1,6 +1,22 @@
 `default_nettype none
 `define WIDTH 16
 
+//Stealing from
+
+//-----------------------------------------------------------------------------
+//| @file h2.vhd
+//| @brief The H2 Processor: J1 processor translation and extension.
+//| Moved bit 12 to bit 4 to allow for more ALU instructions.
+//|
+//| @author         Richard James Howe.
+//| @copyright      Copyright 2017, 2019 Richard James Howe.
+//| @license        MIT
+//| @email          howe.r.j.89@gmail.com
+//|
+//| NB. It would be nice to be able to specify the CPU word length with a
+//| generic, so we could instantiate a 32-bit CPU if we wanted to.
+//-----------------------------------------------------------------------------
+
 module j1(
   input wire clk,
   input wire reset,
@@ -38,6 +54,32 @@ module j1(
   wire [16:0] minus = {1'b1, ~st0} + st1 + 1;
   wire signedless = st0[15] ^ st1[15] ? st1[15] : minus[16];
 
+  wire func_T_N =   (insn[6:4] == 1);
+  wire func_T_R =   (insn[6:4] == 2);
+  wire func_write = (insn[6:4] == 3);
+  wire func_iow =   (insn[6:4] == 4);
+  wire func_ior =   (insn[6:4] == 5);
+
+  assign is_alu = (insn[15:13] == 3'b011);
+  assign is_lit = (insn[15] == 1'b1);
+  assign is_branch = (insn[15:13] == 3'b000);
+  assign is_branch0 = (insn[15:13] == 3'b001);
+  assign is_call = (insn[15:13] == 3'b010);
+  assign is_ram_write = (is_alu & insn[5]);     // N->[T]
+
+  assign more = ($signed(st0) > $signed(st1));
+  assign equal = (st0 == st1);
+  assign umore = ($unsigned(st0) > $unsigned(st1));
+  assign zero = (st0 == 0);
+
+  assign we = (is_ram_write and st0[15:14] == 2'b00);
+
+//	dd(0)            <= instruction(0) after delay;
+//	rd(0)            <= instruction(2) after delay;
+//	dd(dd'high downto 1) <= (others => '1') when instruction(1) = '1' else (others => '0') after delay; -- sign extend
+//	rd(rd'high downto 1) <= (others => '1') when instruction(3) = '1' else (others => '0') after delay; -- sign extend
+//	dstk_we          <= '1' when (is_instr.lit = '1' or (is_instr.alu = '1' and instruction(7) = '1')) else '0' after delay;
+//        <= '1' when is_ram_write = '1' and tos_c(15 downto 14) = "00" else '0' after delay;
   always @*
   begin
     // Compute the new value of st0
@@ -69,13 +111,6 @@ module j1(
     endcase
   end
 
-  wire func_T_N =   (insn[6:4] == 1);
-  wire func_T_R =   (insn[6:4] == 2);
-  wire func_write = (insn[6:4] == 3);
-  wire func_iow =   (insn[6:4] == 4);
-  wire func_ior =   (insn[6:4] == 5);
-
-  wire is_alu = !pc[12] & (insn[15:13] == 3'b011);
   assign mem_wr = !reboot & is_alu & func_write;
   assign dout = st1;
   assign io_wr = !reboot & is_alu & func_iow;
@@ -124,3 +159,4 @@ module j1(
   end
 
 endmodule
+// vim:set shiftwidth=4 softtabstop=4 expandtab:
