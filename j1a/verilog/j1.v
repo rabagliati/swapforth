@@ -117,11 +117,15 @@ wire func_N2A = insn[6];
 
 wire is_lit     = (insn[15]    == 1'b1);
 wire is_alu     = (insn[15:13] == 4'b011);
-wire is_special = (insn[15:12] == 4'b0011);
-wire is_call    = (insn[15:12] == 4'b0010);
-wire is_branch0 = (insn[15:12] == 4'b0001);
-wire is_branch  = (insn[15:12] == 4'b0000);
-wire branchaddr = insn[11:0];
+//wire is_special = (insn[15:12] == 4'b0011);
+//wire is_call    = (insn[15:12] == 4'b0010);
+//wire is_branch0 = (insn[15:12] == 4'b0001);
+//wire is_branch  = (insn[15:12] == 4'b0000);
+//wire branchaddr = insn[11:0];
+wire is_call    = (insn[15:13] == 3'b010);
+wire is_branch0 = (insn[15:13] == 3'b001);
+wire is_branch  = (insn[15:13] == 3'b000);
+wire branchaddr = insn[12:0];
 
 wire alu_op = insn[12:8];
 wire is_ram_write = (is_alu & func_N2A);
@@ -136,11 +140,11 @@ wire dPush = is_lit | (is_alu & func_T2N);          // push data stack
 
 always @* begin                       // Compute the new value of st0
     if (is_lit)
-        st0N = insn[14:0];                    // literal
+        st0N = {1'b0, insn[14:0]};            // literal
     else if (is_branch | is_call)
         st0N = st0;
     else if (is_branch0)
-        st0N = st1;
+        st0N = st1;                                // pop condition
     else if (is_alu) begin                            // ALU operations...
         casez (alu_op)
             5'b00000: st0N = st0;                                   // T
@@ -155,10 +159,10 @@ always @* begin                       // Compute the new value of st0
             5'b01000: st0N = {`WIDTH{more}};                        // N<T
 
             5'b01001: st0N = {st0[`WIDTH - 1], st0[`WIDTH - 1:1]};  // T>>1 (a)
-            5'b01010: st0N = {st0[`WIDTH - 2:0], 1'b0};             // N<<1
+            5'b01010: st0N = st0 - 1;                               // T-1
             5'b01011: st0N = rst0;                                  // R
-            5'b01100: st0N = minus[15:0];                           // N-T
-            5'b01101: st0N = din;                                   // [T]
+            5'b01100: st0N = din;                                   // [T]
+            5'b01101: st0N = {st0[`WIDTH - 2:0], 1'b0};             // T<<1
             5'b01110: st0N = {{(`WIDTH - 4){1'b0}}, dsp};           // depth
             5'b01111: st0N = {`WIDTH{umore}};                       // u<
             default:  st0N = {`WIDTH{1'bx}};
@@ -181,11 +185,13 @@ always @* begin                                 // stacks, pc
     else if (is_branch0)                        // branch0, pop condition
         dspI = 2'b11;
     else if (is_alu)
-        dspI = insn[1:0];
-    else                                        // jump, call, other ALU
+        dspI = insn[1:0];                       // out of the instruction
+    else if (is_jump | is_call)                 // jump, call
+        dspI = 2'b00;                           // nothing
+    else                                        // other ALU
         dspI = 2'b00;                           // nothing
 
-    dspN = dsp + {dspI[1], dspI[1], dspI};
+    dspN = dsp + {dspI[1], dspI[1], dspI};      // poor man sign extend
 
     if (is_call)                                // return stack
         rspI = 2'b01;                           // push

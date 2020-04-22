@@ -82,13 +82,13 @@ a: #t^n    $0500 a; ( T = T xor N )
 a: #~t     $0600 a; ( Invert T )
 a: #t==n   $0700 a; ( T = n == t? )
 a: #n<t    $0800 a; ( T = n < t, signed version )
-a: #n>>t   $0900 a; ( T = n right shift by t places )
+a: #t>>1   $0900 a; ( T = t right shift by 1 )
 a: #t-1    $0A00 a; ( T == t - 1 )
 a: #r      $0B00 a; ( T = Top of Return Stack )
 a: #[t]    $0C00 a; ( T = memory[t] )
-a: #n<<t   $0D00 a; ( T = n left  shift by t places )
+a: #t<<1   $0D00 a; ( T = t left shift by 1 )
 a: #sp@    $0E00 a; ( T = variable stack depth )
-a: #nu<t   $0F00 a; ( T = n < t )
+a: #nu<t   $0F00 a; ( T = n < t, unsigned )
 \ RESERVED: Enable Interrupts
 \ RESERVED: Interrupts Enabled?
 a: #rp@    $1200 a; ( T = return stack depth )
@@ -112,7 +112,7 @@ a: r->pc   $0010 or a; ( Set Program Counter to Top of Return Stack )
 a: n->[t]  $0020 or a; ( Set Top of Variable Stack to Next on Variable Stack )
 a: t->r    $0040 or a; ( Set Top of Return Stack to Top on Variable Stack )
 a: t->n    $0080 or a; ( Set Next on Variable Stack to Top on Variable Stack )
-: ?set dup $E000 and abort" argument too large " ; ( u -- )
+: ?set dup $8000 and abort" argument too large " ; ( u -- )
 a: branch  2/ ?set [a] #branch  or t, a; ( a -- : an Unconditional branch )
 a: ?branch 2/ ?set [a] #?branch or t, a; ( a -- : Conditional branch )
 a: call    2/ ?set [a] #call    or t, a; ( a -- : Function call )
@@ -219,8 +219,8 @@ a: return ( -- : Compile a return into the target )
 : r>       ]asm #r      t->n           r-1 d+1 alu asm[ ;
 : r@       ]asm #r      t->n               d+1 alu asm[ ;
 : @        ]asm #[t]                           alu asm[ ;
-: rshift   ]asm #n>>t                      d-1 alu asm[ ;
-: lshift   ]asm #n<<t                      d-1 alu asm[ ;
+: t>>1     ]asm #t>>1                          alu asm[ ;
+: t<<1     ]asm #t<<1                          alu asm[ ;
 : =        ]asm #t==n                      d-1 alu asm[ ;
 : u<       ]asm #nu<t                      d-1 alu asm[ ;
 : <        ]asm #n<t                       d-1 alu asm[ ;
@@ -343,8 +343,6 @@ xchange _system _forth-wordlist
 : drop     drop     ; ( n -- : remove item on stack )
 : @        @        ; ( a -- u : load value at address )
 : !     store drop  ; ( u a -- : store *u* at address *a* )
-: rshift   rshift   ; ( u1 u2 -- u : shift u2 by u1 places to the right )
-: lshift   lshift   ; ( u1 u2 -- u : shift u2 by u1 places to the left )
 : =        =        ; ( u1 u2 -- t : does u2 equal u1? )
 : u<       u<       ; ( u1 u2 -- t : is u2 less than u1 )
 : <        <        ; ( u1 u2 -- t : is u2 less than u1, signed version )
@@ -387,8 +385,8 @@ h: over+ over + ;           ( u1 u2 -- u1 u1+2 )
 : bye 0 [-1] yield!? ( $38 -throw ) ; ( -- : leave the interpreter )
 h: cell- cell - ;           ( a -- a : adjust address to previous cell )
 : cell+  cell + ;           ( a -- a : move address forward to next cell )
-: cells 1 lshift ;          ( n -- n : convert cells count to address count )
-: chars 1 rshift ;          ( n -- n : convert bytes to number of cells )
+: cells t<<1 ;              ( n -- n : convert cells count to address count )
+: chars 1 t>>1   ;          ( n -- n : convert bytes to number of cells )
 : ?dup dup if dup exit then ; ( n -- 0 | n n : duplicate non zero value )
 : >  swap  < ;              ( n1 n2 -- t : signed greater than, n1 > n2 )
 : u> swap u< ;              ( u1 u2 -- t : unsigned greater than, u1 > u2 )
@@ -423,6 +421,8 @@ h: dnegate invert >r invert 1 um+ r> + ; ( d -- d )
 h: d+ >r swap >r um+ r> + r> + ;         ( d d -- d )
 : execute >r ;                   ( cfa -- : execute a function )
 h: @execute @ ?dup if execute exit then ;  ( cfa -- )
+: lshift begin dup while swap t<<1 swap 1- repeat drop ;
+: rshift begin dup while swap t>>1 $7FFF and swap 1- repeat drop ;
 : c@ dup@ swap first-bit 3 lshift rshift h: lsb $FF and ;; ( b--c: char load )
 : c! ( c b -- : store character at address )
   tuck first-bit 3 lshift dup>r swap lsb swap
