@@ -1,10 +1,10 @@
-module Stack #(
+module reftack #(
     parameter WIDTH = 11,
     parameter DEPTH = 7
 ) (
     input                    clk,
-    input      [WIDTH - 1:0] d,
-    output reg [WIDTH - 1:0] q,
+    input      [WIDTH - 1:0] in,
+    output reg [WIDTH - 1:0] out,
     input                    push,
     input                    pop,
     input                    reset
