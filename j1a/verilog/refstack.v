@@ -1,4 +1,4 @@
-module reftack #(
+module refstack #(
     parameter WIDTH = 11,
     parameter DEPTH = 7
 ) (
@@ -25,9 +25,9 @@ end
 always @(posedge clk) begin
     if (push || pop) begin
         if(push)
-            stack[ptr] <= d;
+            stack[ptr] <= in;
 
-        q <= stack[ptr - 1];
+        out <= stack[ptr - 1];
     end
 end
 

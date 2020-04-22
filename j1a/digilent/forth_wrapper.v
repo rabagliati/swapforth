@@ -13,7 +13,6 @@ module forth_wrapper
 
 reg clk=0, reset=0;
 
-wire io_rd, io_wr;
 wire [LOG2ABITS-1:0] addra, addrb;
 wire wea, web;
 reg [DWIDTH-1:0] reada, readb;
@@ -22,11 +21,9 @@ wire [DWIDTH-1:0] writea, writeb;
 j1 _j1(
     .clk(clk),
     .reset(reset),
-    .io_rd(io_rd),
-    .io_wr(io_wr),
     .mem_wr(web),
     .dout(writeb),
-    .io_din(readb),
+    .din(readb),
     .mem_addr(addrb),
     .code_addr(addra),
     .insn(reada));

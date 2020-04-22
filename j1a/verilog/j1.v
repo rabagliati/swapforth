@@ -33,7 +33,6 @@ module j1 (
 
 reg [3:0] dsp, dspN;          // data stack pointer
 reg [`WIDTH-1:0] st0, st0N;   // top of data stack
-reg dPush;                    // data stack write
 
 reg [12:0] pc /* verilator public_flat */, pcN;           // program counter
 wire [12:0] pc_plus_1 = pc + 13'd1;
@@ -56,7 +55,7 @@ refstack #(
     .out(st1),
     .push(dPush),
     .in(st0),
-    .reset(reset),
+    .reset(reset)
 );
 
 refstack #(
@@ -68,7 +67,7 @@ refstack #(
     .out(rst0),
     .push(rPush),
     .in(rstkD),
-    .reset(reset),
+    .reset(reset)
 );
 
 //
@@ -112,28 +111,28 @@ refstack #(
 wire [16:0] minus = {1'b1, ~st0} + st1 + 1;
 wire signedless = st0[15] ^ st1[15] ? st1[15] : minus[16];
 
-assign func_T2N = insn[4];
-assign func_T2R = insn[5];
-assign func_N2A = insn[6];
+wire func_T2N = insn[4];
+wire func_T2R = insn[5];
+wire func_N2A = insn[6];
 
-assign is_lit     = (insn[15]    == 1'b1);
-assign is_alu     = (insn[15:13] == 4'b011);
-assign is_special = (insn[15:12] == 4'b0011);
-assign is_call    = (insn[15:12] == 4'b0010);
-assign is_branch0 = (insn[15:12] == 4'b0001);
-assign is_branch  = (insn[15:12] == 4'b0000);
-assign branchaddr = insn[11:0];
+wire is_lit     = (insn[15]    == 1'b1);
+wire is_alu     = (insn[15:13] == 4'b011);
+wire is_special = (insn[15:12] == 4'b0011);
+wire is_call    = (insn[15:12] == 4'b0010);
+wire is_branch0 = (insn[15:12] == 4'b0001);
+wire is_branch  = (insn[15:12] == 4'b0000);
+wire branchaddr = insn[11:0];
 
-assign alu_op = insn[12:8];
-assign is_ram_write = (is_alu & func_N2A);
+wire alu_op = insn[12:8];
+wire is_ram_write = (is_alu & func_N2A);
 
-assign more = ($signed(st0) > $signed(st1));
-assign equal = (st0 == st1);
-assign umore = ($unsigned(st0) > $unsigned(st1));
-assign zero = (st0 == 0);
+wire more = ($signed(st0) > $signed(st1));
+wire equal = (st0 == st1);
+wire umore = ($unsigned(st0) > $unsigned(st1));
+wire zero = (st0 == 0);
 
-assign we = (is_ram_write and st0[15:13] == 3'b000);  // within range
-assign dPush = is_lit | (is_alu & func_T2N);          // push data stack
+wire we = (is_ram_write & (st0[15:13] == 3'b000));  // within range
+wire dPush = is_lit | (is_alu & func_T2N);          // push data stack
 
 always @* begin                       // Compute the new value of st0
     if (is_lit)
@@ -144,32 +143,32 @@ always @* begin                       // Compute the new value of st0
         st0N = st1;
     else if (is_alu) begin                            // ALU operations...
         casez (alu_op)
-            5'00000: st0N = st0;                                   // T
-            5'00001: st0N = st1;                                   // N
-            5'00010: st0N = st0 + st1;                             // T+N
-            5'00011: st0N = st0 & st1;                             // T&N
-            5'00100: st0N = st0 | st1;                             // T|N
-            5'00101: st0N = st0 ^ st1;                             // T^N
-            5'00110: st0N = ~st0;
+            5'b00000: st0N = st0;                                   // T
+            5'b00001: st0N = st1;                                   // N
+            5'b00010: st0N = st0 + st1;                             // T+N
+            5'b00011: st0N = st0 & st1;                             // T&N
+            5'b00100: st0N = st0 | st1;                             // T|N
+            5'b00101: st0N = st0 ^ st1;                             // T^N
+            5'b00110: st0N = ~st0;
 
-            5'00111: st0N = {`WIDTH{equal}};                       // N=T
-            5'01000: st0N = {`WIDTH{more}};                        // N<T
+            5'b00111: st0N = {`WIDTH{equal}};                       // N=T
+            5'b01000: st0N = {`WIDTH{more}};                        // N<T
 
-            5'01001: st0N = {st0[`WIDTH - 1], st0[`WIDTH - 1:1]};  // T>>1 (a)
-            5'01010: st0N = {st0[`WIDTH - 2:0], 1'b0};             // N<<1
-            5'01011: st0N = rst0;                                  // R
-            5'01100: st0N = minus[15:0];                           // N-T
-            5'01101: st0N = io_din;                                // [T]
-            5'01110: st0N = {{(`WIDTH - 4){1'b0}}, dsp};           // depth
-            5'01111: st0N = {`WIDTH{umore}};                    // u<
-            default: st0N = {`WIDTH{1'bx}};
+            5'b01001: st0N = {st0[`WIDTH - 1], st0[`WIDTH - 1:1]};  // T>>1 (a)
+            5'b01010: st0N = {st0[`WIDTH - 2:0], 1'b0};             // N<<1
+            5'b01011: st0N = rst0;                                  // R
+            5'b01100: st0N = minus[15:0];                           // N-T
+            5'b01101: st0N = din;                                   // [T]
+            5'b01110: st0N = {{(`WIDTH - 4){1'b0}}, dsp};           // depth
+            5'b01111: st0N = {`WIDTH{umore}};                       // u<
+            default:  st0N = {`WIDTH{1'bx}};
         endcase
     end
     else
         st0N = {`WIDTH{1'bx}};
 end
 
-assign mem_wr = !reboot & is_alu & func_write;
+assign mem_wr = !reboot & is_alu & func_N2A;
 assign dout = st1;
 
 assign rstkD = (is_call) ?                      // call
@@ -177,7 +176,7 @@ assign rstkD = (is_call) ?                      // call
     : st0;                                      // T2R
 
 always @* begin                                 // stacks, pc
-    if (is_literal)                             // data stack
+    if (is_lit)                                 // data stack
         dspI = 2'b01;
     else if (is_branch0)                        // branch0, pop condition
         dspI = 2'b11;
@@ -187,7 +186,6 @@ always @* begin                                 // stacks, pc
         dspI = 2'b00;                           // nothing
 
     dspN = dsp + {dspI[1], dspI[1], dspI};
-    dPush = (dspI == 2'b01);
 
     if (is_call)                                // return stack
         rspI = 2'b01;                           // push
@@ -199,7 +197,7 @@ always @* begin                                 // stacks, pc
 
     if (reboot)
         pcN = 0;
-    else if is_branch | is_call | (is_branch0 & (~|st0))
+    else if (is_branch | is_call | (is_branch0 & (~|st0)))
         pcN = branchaddr;
     else
         pcN = pc_plus_1;
