@@ -2,12 +2,12 @@ module refstack #(
     parameter WIDTH = 11,
     parameter DEPTH = 7
 ) (
-    input                    clk,
-    input      [WIDTH - 1:0] in,
+    input wire               clk,
+    input wire [WIDTH - 1:0] in,
     output reg [WIDTH - 1:0] out,
-    input                    push,
-    input                    pop,
-    input                    reset
+    input wire               push,
+    input wire               pop,
+    input wire               reset
 );
 
 reg [DEPTH - 1:0] ptr;

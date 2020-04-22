@@ -186,7 +186,7 @@ always @* begin                                 // stacks, pc
         dspI = 2'b11;
     else if (is_alu)
         dspI = insn[1:0];                       // out of the instruction
-    else if (is_jump | is_call)                 // jump, call
+    else if (is_branch | is_call)               // jump, call
         dspI = 2'b00;                           // nothing
     else                                        // other ALU
         dspI = 2'b00;                           // nothing
