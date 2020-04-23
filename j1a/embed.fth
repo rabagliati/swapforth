@@ -232,7 +232,8 @@ a: return ( -- : Compile a return into the target )
 : 1-       ]asm #t-1                           alu asm[ ;
 : rp@      ]asm #rp@    t->n               d+1 alu asm[ ;
 
-: 0=       ]asm #t==0                          alu asm[ ;
+\ : 0=       ]asm #t==0                          alu asm[ ;
+
 : yield?   ]asm #bye                           alu asm[ ;
 : rx?      ]asm #rx     t->n               d+1 alu asm[ ;
 : tx!      ]asm #tx                            alu asm[ ;
@@ -350,7 +351,7 @@ xchange _system _forth-wordlist
 : xor      xor      ; ( u u -- u : bitwise exclusive or )
 : or       or       ; ( u u -- u : bitwise or )
 : 1-       1-       ; ( u -- u : decrement top of stack )
-: 0=       0=       ; ( u -- t : if top of stack equal to zero )
+: 0=       0 =      ; ( u -- t : if top of stack equal to zero )
 xchange _forth-wordlist _system
 : rx?     rx?  0    ; ( -- c t | -1 t : fetch a single character, or EOF )
 : tx!     tx! drop  ; ( c -- : transmit single character )

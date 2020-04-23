@@ -5,7 +5,7 @@
 module forth_wrapper
 #(
     parameter MEM_INIT_FILE = "/home/andyr/git/vivado/src/swapforth/j1a/digilent/image.hex",
-    parameter LOG2ABITS=11,
+    parameter LOG2ABITS=12,
     parameter DWIDTH = 16
 )
 (

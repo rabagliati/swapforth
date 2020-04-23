@@ -78,7 +78,7 @@ refstack #(
 //	+---------------------------------------------------------------+
 //	| 0 | 1 | 1 |   ALU OPERATION   |T2N|T2R|N2A|R2P| RSTACK| DSTACK|
 //	+---------------------------------------------------------------+
-//	| 0 | 1 | 0 |X++|Y++|Z++|X--|Y--|Z--|    EXTENDED OPERATION     |
+//	| 0 | 1 | 0 |            EXTENDED OPERATION     | DELTA | XYorZ |
 //	+---------------------------------------------------------------+
 //	| 0 | 0 | 1 | 1 |        EXTEND TARGET ADDRESS                  |
 //	+---------------------------------------------------------------+
@@ -125,7 +125,7 @@ wire is_alu     = (insn[15:13] == 4'b011);
 wire is_call    = (insn[15:13] == 3'b010);
 wire is_branch0 = (insn[15:13] == 3'b001);
 wire is_branch  = (insn[15:13] == 3'b000);
-wire branchaddr = insn[12:0];
+wire [12:0] branchaddr = insn[12:0];
 
 wire alu_op = insn[12:8];
 wire is_ram_write = (is_alu & func_N2A);
