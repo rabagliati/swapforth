@@ -291,7 +291,7 @@ a: #branch  $0000 a; ( unconditional branch )
 \ C code. Unfortunately this would not include that rationale that led to
 \ the virtual machine being the way it is.
 \ 
-\ ALU Operations
+\ ALU Operations - only 4 bits
 a: #t      $0000 a; ( T = t )
 a: #n      $0100 a; ( T = n )
 a: #t+n    $0200 a; ( T = n+t  )
@@ -310,26 +310,27 @@ a: #sp@    $0E00 a; ( T = variable stack depth )
 a: #nu<t   $0F00 a; ( T = n < t, unsigned )
 \ RESERVED: Enable Interrupts
 \ RESERVED: Interrupts Enabled?
-a: #rp@    $1200 a; ( T = return stack depth )
-a: #t==0   $1300 a; ( T == 0? )
+\ a: #rp@    $1200 a; ( T = return stack depth )
+\ a: #t==0   $1300 a; ( T == 0? )
 \ RESERVED: CPU-ID
 \ RESERVED: Literal
 \ UNUSED
 \ UNUSED
-a: #save   $1900 a; ( Save memory disk: n = start, T = end, T' = error )
-a: #tx     $1A00 a; ( Transmit Byte: t = byte, T' = error )
-a: #rx     $1B00 a; ( Block until byte received, T = byte/error )
-a: #bye    $1C00 a; ( Exit Interpreter )
-a: #cpu    $1D00 a; ( CPU information )
+\ a: #save   $1900 a; ( Save memory disk: n = start, T = end, T' = error )
+\ a: #tx     $1A00 a; ( Transmit Byte: t = byte, T' = error )
+\ a: #rx     $1B00 a; ( Block until byte received, T = byte/error )
+\ a: #bye    $1C00 a; ( Exit Interpreter )
+\ a: #cpu    $1D00 a; ( CPU information )
 
 \ The Stack Delta Operations occur after the ALU operations have been executed.
 \ They affect either the Return or the Variable Stack.
-a: d+1     $0001 or a; ( increment variable stack by one )
-a: d-1     $0003 or a; ( decrement variable stack by one )
-( a: d-2   $0002 or a; ( decrement variable stack by two, not used )
-a: r+1     $0004 or a; ( increment variable stack by one )
-a: r-1     $000C or a; ( decrement variable stack by one )
-( a: r-2   $0008 or a; ( decrement variable stack by two, not used )
+\ {rpop, rpsh, dpop, dpsh} = insn[3:0]
+
+a: dpop    $0002 or a; ( decrement variable stack by one )
+a: dpsh    $0001 or a; ( increment variable stack by one )
+a: dboth   $0003 or a; ( stack remains, but top element changed )
+a: rpop    $0008 or a; ( decrement variable stack by one )
+a: rpsh    $0004 or a; ( increment variable stack by one )
 
 \ All of these instructions execute after the ALU and stack delta operations
 \ have been performed except r->pc, which occurs before. They form part of
@@ -345,7 +346,7 @@ a: t->n    $0080 or a; ( Set Next on Variable Stack to Top on Variable Stack )
 \ comprise of an ALU operation, stack effects and register move bits. Function
 \ returns are part of the ALU operation instruction set.
 
-: ?set dup $8000 and abort" argument too large " ; ( u -- )
+: ?set dup $F000 and abort" argument too large " ; ( u -- )
 a: branch  2/ ?set [a] #branch  or t, a; ( a -- : an Unconditional branch )
 a: ?branch 2/ ?set [a] #?branch or t, a; ( a -- : Conditional branch )
 a: call    2/ ?set [a] #call    or t, a; ( a -- : Function call )
@@ -401,11 +402,11 @@ a: return ( -- : Compile a return into the target )
 
 : previous there =cell - ;                      ( -- a )
 : lookback previous t@ ;                        ( -- u )
-: call? lookback $E000 and [a] #call = ;        ( -- t )
-: call>goto previous dup t@ $1FFF and swap t! ; ( -- )
+: call? lookback $F000 and [a] #call = ;        ( -- t )
+: call>goto previous dup t@ $0FFF and swap t! ; ( -- )
 : fence? fence @  previous u> ;                 ( -- t )
-: safe? lookback $E000 and [a] #alu = lookback $001C and 0= and ; ( -- t )
-: alu>return previous dup t@ [a] r->pc [a] r-1 swap t! ; ( -- )
+: safe? lookback $F000 and [a] #alu = lookback $001C and 0= and ; ( -- t )
+: alu>return previous dup t@ [a] r->pc [a] rpop swap t! ; ( -- )
 : exit-optimize                                 ( -- )
   fence? if [a] return exit then
   call?  if call>goto  exit then
@@ -645,7 +646,9 @@ a: return ( -- : Compile a return into the target )
 : r@       ]asm #r      t->n               d+1 alu asm[ ;
 : @        ]asm #[t]                           alu asm[ ;
 : t>>1     ]asm #t>>1                          alu asm[ ;
+: 2/       ]asm #t>>1                          alu asm[ ;
 : t<<1     ]asm #t<<1                          alu asm[ ;
+: 2*       ]asm #t<<1                          alu asm[ ;
 : =        ]asm #t==n                      d-1 alu asm[ ;
 : u<       ]asm #nu<t                      d-1 alu asm[ ;
 : <        ]asm #n<t                       d-1 alu asm[ ;
