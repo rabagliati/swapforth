@@ -54,7 +54,7 @@ reg [`DSTACKLOG2:0] depth, rdepth;      // one bit longer, DEBUG
 //	+---------------------------------------------------------------+
 //	| 0 | 1 |CLR|SET|SCH|ADD| XYorZ | F3+MSK| F2+MSK| F1+MSK|DAT+MSK|
 //	+---------------------------------------------------------------+
-//	| 0 | 1 | 1 |   ALU OPERATION   |T2N|T2R|N2A|R2P|PPr|PSH|PPd|PSH|
+//	| 0 | 0 | 1 | 1 | ALU OPERATION |T2N|T2R|N2A|R2P|PPr|PSH|PPd|PSH|
 //	+---------------------------------------------------------------+
 //	| 0 | 0 | 1 | 0 |        CALL TARGET ADDRESS                    |
 //	+---------------------------------------------------------------+
@@ -100,9 +100,9 @@ wire signedless = st0[15] ^ st1[15] ? st1[15] : minus[16];
 wire is_lit     = (insn[15]    == 1'b1);
 wire is_special = (insn[15:14] == 2'b01);
 wire is_alu     = (insn[15:12] == 4'b0011);
-wire is_branch  = (insn[15:12] == 4'b0010);
+wire is_call    = (insn[15:12] == 4'b0010);
 wire is_branch0 = (insn[15:12] == 4'b0001);
-wire is_call    = (insn[15:12] == 4'b0000);
+wire is_branch  = (insn[15:12] == 4'b0000);
 wire [`BRANCHWIDTH:0] branchaddr = insn[`BRANCHWIDTH:0];
 
 wire [4:0] alu_op = insn[`BRANCHWIDTH:7];
