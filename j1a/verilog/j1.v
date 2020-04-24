@@ -18,10 +18,11 @@
 //| generic, so we could instantiate a 32-bit CPU if we wanted to.
 //-----------------------------------------------------------------------------
 
-module
+module j1
 #(
     parameter DSTACKLOG2 = 4,
-    parameter RSTACKLOG2 = 4) j1 (
+    parameter RSTACKLOG2 = 4
+) (
     input wire clk,
 
     output wire [15:0] mem_addr,
@@ -43,7 +44,7 @@ reg [12:0] pc /* verilator public_flat */, pcN;           // program counter
 reg dpop, dpush, rpop, rpush;
 
 reg reboot = 1;
-reg [`DSTACKLOG2:0] depth, rdepth;      // one bit longer, DEBUG
+reg [DSTACKLOG2:0] depth, rdepth;      // one bit longer, DEBUG
 
 
 //
@@ -205,9 +206,9 @@ always @* begin                                 // stacks, pc
     else if (is_branch | is_call)               // jump, call
         {dpop, dpush} = 2'b00;
     else if (is_special)
-        dspI = 2'b00;                           // nothing
+        {dpop, dpush} = 2'b00;                           // nothing
     else
-        dspI = 2'b00;
+        {dpop, dpush} = 2'b00;
 
     // ---------------------------------------
     //                      return stack
@@ -218,8 +219,7 @@ always @* begin                                 // stacks, pc
     if (is_alu)
         {rpop, rpush} = insn[3:2];              // out of instruction
     else
-        rspI = 2'b00;                           // nothing
-    rPush = (rspI == 2'b01);
+        {rpop, rpush} = 2'b00;                           // nothing
 
     // ---------------------------------------
     //                      program counter
