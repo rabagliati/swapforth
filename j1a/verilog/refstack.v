@@ -1,6 +1,6 @@
 module refstack #(
-    parameter WIDTH = 11,
-    parameter DEPTH = 7
+    parameter WIDTH = 16,
+    parameter DEPTHLOG2 = 3
 ) (
     input wire               clk,
     input wire [WIDTH - 1:0] in,
@@ -10,24 +10,24 @@ module refstack #(
     input wire               reset
 );
 
-reg [DEPTH - 1:0] ptr;
-reg [WIDTH - 1:0] stack [0:(1 << DEPTH) - 1];
+reg [DEPTHLOG2 - 1:0] ptr;
+reg [WIDTH - 1:0] stack [0:(1<<DEPTHLOG2)-1];
 
 always @(posedge clk) begin
-    if (reset)
-        ptr <= 0;
-    else if (push)
+    if      (reset)     ptr <= 0;
+    if (pop & push)    // pop current, push new
+    begin
+        out <= in;
+        stack[ptr-1] <= in;
+    end
+    else if (push) begin
+        out <= in;
+        stack[ptr] <= in;
         ptr <= ptr + 1;
-    else if (pop)
+    end
+    else if (pop) begin
+        out <= stack[ptr - 2];
         ptr <= ptr - 1;
-end
-
-always @(posedge clk) begin
-    if (push || pop) begin
-        if(push)
-            stack[ptr] <= in;
-
-        out <= stack[ptr - 1];
     end
 end
 
