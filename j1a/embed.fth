@@ -254,7 +254,7 @@ $26 constant (header-options)
 : finished ( -- : save target image and display statistics )
    display
    only forth definitions hex
-   ." SAVING..." save-hex ." DONE" cr
+   ." SAVING..." ." save-hex" ." DONE" cr
    ." STACK>" .s cr ;
 
 \ ### The Assembler
@@ -322,6 +322,7 @@ a: #nu<t   $0F00 a; ( T = n < t, unsigned )
 \ a: #bye    $1C00 a; ( Exit Interpreter )
 \ a: #cpu    $1D00 a; ( CPU information )
 
+.( ALU_OP ) cr
 \ The Stack Delta Operations occur after the ALU operations have been executed.
 \ They affect either the Return or the Variable Stack.
 \ {rpop, rpsh, dpop, dpsh} = insn[3:0]
@@ -346,6 +347,7 @@ a: t->n    $0080 or a; ( Set Next on Variable Stack to Top on Variable Stack )
 \ comprise of an ALU operation, stack effects and register move bits. Function
 \ returns are part of the ALU operation instruction set.
 
+.( STACK ) cr
 : ?set dup $F000 and abort" argument too large " ; ( u -- )
 a: branch  2/ ?set [a] #branch  or t, a; ( a -- : an Unconditional branch )
 a: ?branch 2/ ?set [a] #?branch or t, a; ( a -- : Conditional branch )
@@ -360,8 +362,9 @@ a: literal ( n -- : compile a number into target )
     [a] #literal or t, ( numbers below $8000 are single instructions )
   then a;
 a: return ( -- : Compile a return into the target )
-   [a] #t [a] r->pc [a] r-1 [a] alu a;
+   [a] #t [a] r->pc [a] rpop [a] alu a;
 
+.( BRANCH ) cr
 \ ### Peep hole Optimizer
 \
 \ The following words implement a primitive peephole optimizer, which is not
@@ -402,9 +405,13 @@ a: return ( -- : Compile a return into the target )
 
 : previous there =cell - ;                      ( -- a )
 : lookback previous t@ ;                        ( -- u )
+
+\ mask top bits to locate instruction class
 : call? lookback $F000 and [a] #call = ;        ( -- t )
+\ depends on the jump class having top bits 0000
 : call>goto previous dup t@ $0FFF and swap t! ; ( -- )
 : fence? fence @  previous u> ;                 ( -- t )
+\ does previous alu instruction fiddle with return stack [3:2] or flag r->pc [4]
 : safe? lookback $F000 and [a] #alu = lookback $001C and 0= and ; ( -- t )
 : alu>return previous dup t@ [a] r->pc [a] rpop swap t! ; ( -- )
 : exit-optimize                                 ( -- )
@@ -634,45 +641,48 @@ a: return ( -- : Compile a return into the target )
 
 (               ALU     t->n t->r n->a rp  sp   NB. 'r->pc' in 'exit'  )
 : nop      ]asm #t                             alu asm[ ;
-: dup      ]asm #t      t->n               d+1 alu asm[ ;
-: over     ]asm #n      t->n               d+1 alu asm[ ;
+: dup      ]asm #t      t->n              dpsh alu asm[ ;
+: over     ]asm #n      t->n              dpsh alu asm[ ;
 : invert   ]asm #~t                            alu asm[ ;
-: +        ]asm #t+n                       d-1 alu asm[ ;
+: +        ]asm #t+n                      dpop alu asm[ ;
 : swap     ]asm #n      t->n                   alu asm[ ;
-: nip      ]asm #t                         d-1 alu asm[ ;
-: drop     ]asm #n                         d-1 alu asm[ ;
-: >r       ]asm #n           t->r      r+1 d-1 alu asm[ ;
-: r>       ]asm #r      t->n           r-1 d+1 alu asm[ ;
-: r@       ]asm #r      t->n               d+1 alu asm[ ;
+: nip      ]asm #t                        dpop alu asm[ ;
+: drop     ]asm #n                        dpop alu asm[ ;
+: >r       ]asm #n           t->r    rpsh dpop alu asm[ ;
+: r>       ]asm #r      t->n         rpop dpsh alu asm[ ;
+: r@       ]asm #r      t->n              dpsh alu asm[ ;
 : @        ]asm #[t]                           alu asm[ ;
 : t>>1     ]asm #t>>1                          alu asm[ ;
-: 2/       ]asm #t>>1                          alu asm[ ;
 : t<<1     ]asm #t<<1                          alu asm[ ;
-: 2*       ]asm #t<<1                          alu asm[ ;
-: =        ]asm #t==n                      d-1 alu asm[ ;
-: u<       ]asm #nu<t                      d-1 alu asm[ ;
-: <        ]asm #n<t                       d-1 alu asm[ ;
-: and      ]asm #t&n                       d-1 alu asm[ ;
-: xor      ]asm #t^n                       d-1 alu asm[ ;
-: or       ]asm #t|n                       d-1 alu asm[ ;
-: sp@      ]asm #sp@    t->n               d+1 alu asm[ ;
+: =        ]asm #t==n                     dpop alu asm[ ;
+: u<       ]asm #nu<t                     dpop alu asm[ ;
+: <        ]asm #n<t                      dpop alu asm[ ;
+: and      ]asm #t&n                      dpop alu asm[ ;
+: xor      ]asm #t^n                      dpop alu asm[ ;
+: or       ]asm #t|n                      dpop alu asm[ ;
+: sp@      ]asm #sp@    t->n              dpsh alu asm[ ;
 : 1-       ]asm #t-1                           alu asm[ ;
-: rp@      ]asm #rp@    t->n               d+1 alu asm[ ;
+\ : rp@      ]asm #rp@    t->n              dpsh alu asm[ ;
+: rp@      ]asm #t                             alu asm[ ;
 
 \ : 0=       ]asm #t==0                          alu asm[ ;
 
-: yield?   ]asm #bye                           alu asm[ ;
-: rx?      ]asm #rx     t->n               d+1 alu asm[ ;
-: tx!      ]asm #tx                            alu asm[ ;
-: (save)   ]asm #save                      d-1 alu asm[ ;
-: rdrop    ]asm #t                     r-1     alu asm[ ;
-: dup@     ]asm #[t]    t->n               d+1 alu asm[ ;
-: dup0=    ]asm #t==0   t->n               d+1 alu asm[ ;
-: dup>r    ]asm #t           t->r      r+1     alu asm[ ;
-: 2dup=    ]asm #t==n   t->n               d+1 alu asm[ ;
-: 2dupxor  ]asm #t^n    t->n               d+1 alu asm[ ;
-: store    ]asm #n      n->a               d-1 alu asm[ ;
-: 2dup<    ]asm #n<t    t->n               d+1 alu asm[ ;
+\ : yield?   ]asm #bye                           alu asm[ ;
+: yield?      ]asm #t                             alu asm[ ;
+\ : rx?      ]asm #rx     t->n              dpsh alu asm[ ;
+: rx?      ]asm #t                             alu asm[ ;
+\ : tx!      ]asm #tx                            alu asm[ ;
+: tx?      ]asm #t                             alu asm[ ;
+\ : (save)   ]asm #save                     dpop alu asm[ ;
+: (save)      ]asm #t                             alu asm[ ;
+: rdrop    ]asm #t                   rpop      alu asm[ ;
+: dup@     ]asm #[t]    t->n              dpsh alu asm[ ;
+\ : dup0=    ]asm #t==0   t->n              dpsh alu asm[ ;
+: dup>r    ]asm #t           t->r    rpsh      alu asm[ ;
+: 2dup=    ]asm #t==n   t->n              dpsh alu asm[ ;
+: 2dupxor  ]asm #t^n    t->n              dpsh alu asm[ ;
+: store    ]asm #n      n->a              dpop alu asm[ ;
+: 2dup<    ]asm #n<t    t->n              dpsh alu asm[ ;
 : rxchg    ]asm #r             t->r            alu asm[ ;
 : over-and ]asm #t&n                           alu asm[ ;
 : over-xor ]asm #t^n                           alu asm[ ;
@@ -687,8 +697,9 @@ hide meta:
 hide t:
 hide t;
 ]asm #~t              ALU asm[ constant =invert ( invert instruction )
-]asm #t  r->pc    r-1 ALU asm[ constant =exit   ( return/exit instruction )
-]asm #n  t->r d-1 r+1 ALU asm[ constant =>r     ( to r. stk. instruction )
+]asm #t  r->pc  rpop  ALU asm[ constant =exit   ( return/exit instruction )
+]asm #n  t->r dpop rpsh ALU asm[ constant =>r     ( to r. stk. instruction )
+
 $20   constant =bl         ( blank, or space )
 $D    constant =cr         ( carriage return )
 $A    constant =lf         ( line feed )
@@ -908,10 +919,11 @@ xchange _system _forth-wordlist
 : or       or       ; ( u u -- u : bitwise or )
 : 1-       1-       ; ( u -- u : decrement top of stack )
 : 0=       0 =      ; ( u -- t : if top of stack equal to zero )
+: dup0= dup 0= ;      ( u -- t u : if tos == 0 )
 xchange _forth-wordlist _system
 : rx?     rx?  0    ; ( -- c t | -1 t : fetch a single character, or EOF )
 : tx!     tx! drop  ; ( c -- : transmit single character )
-: (save)   (save)   ; ( u1 u2 -- u : save memory from u1 to u2 inclusive )
+: (save)   drop drop 99 ; ( u1 u2 -- u : save memory from u1 to u2 inclusive )
 : vm       vm       ; ( ??? -- ??? : perform arbitrary VM call )
 xchange _system _forth-wordlist
 there constant inline-start
@@ -999,6 +1011,7 @@ h: doNext 2r> ?dup if 1- >r @ >r exit then cell+ >r ;
   if >r over um+ r> + then
   next rot drop ;
 : *    um* drop ;                     ( n n -- n )
+: rp@ 99 ;
 h: rp! ( n -- , R: ??? -- ??? : set the return stack pointer )
   r> swap begin dup rp@ = 0= while rdrop repeat drop >r ;
 : min 2dup< fallthrough;              ( n n -- n )
