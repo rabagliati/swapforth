@@ -254,7 +254,7 @@ $26 constant (header-options)
 : finished ( -- : save target image and display statistics )
    display
    only forth definitions hex
-   ." SAVING..." ." save-hex" ." DONE" cr
+   ." SAVING..." save-hex ." DONE" cr
    ." STACK>" .s cr ;
 
 \ ### The Assembler
@@ -269,9 +269,9 @@ $26 constant (header-options)
 \ other by the top bits of the instruction.
 
 a: #literal $8000 a; ( literal instruction - top bit set )
-a: #alu     $6000 a; ( ALU instruction, further encoding below... )
-a: #call    $4000 a; ( function call instruction )
-a: #?branch $2000 a; ( branch if zero instruction )
+a: #alu     $3000 a; ( ALU instruction, further encoding below... )
+a: #call    $2000 a; ( function call instruction )
+a: #?branch $1000 a; ( branch if zero instruction )
 a: #branch  $0000 a; ( unconditional branch )
 
 \ An ALU instruction has a more complex encoding which can be seen in the table
@@ -1289,7 +1289,7 @@ h: doLit 0x8000 or , ;                 ( n+ -- : compile literal )
     invert doLit =invert , exit ( store inversion of n the invert it )
   then
   doLit ; compile-only immediate ( turn into literal, write into dictionary )
-h: make-callable chars $4000 or ;    ( cfa -- instruction )
+h: make-callable chars $2000 or ;    ( cfa -- instruction )
 : compile, make-callable , ;         ( cfa -- : compile a code field address )
 h: $compile dup inline? if cfa @ , exit then cfa compile, ; ( pwd -- )
 h: not-found source type $D -throw ; ( -- : throw 'word not found' )
@@ -1402,7 +1402,7 @@ h: get-current! ?dup if get-current ! exit then ; ( -- wid )
   last , token ?nul ?unique count+ cp! magic postpone ] ;
 : begin here  ; immediate compile-only   ( -- a )
 : again chars , ; immediate compile-only ( a -- )
-: until $4000 or postpone again ; immediate compile-only ( a --, NB. again !? )
+: until $2000 or postpone again ; immediate compile-only ( a --, NB. again !? )
 h: here-0 here 0x0000 ;
 h: >mark here-0 postpone again ;
 : if here-0 postpone until ; immediate compile-only
@@ -1513,51 +1513,51 @@ h: cold ( -- : performs a cold boot  )
 h: hi hex ." eFORTH v" $1984 0 u.r cr decimal here . fallthrough;
 h: .free $4000 here - u. cr ;             ( -- : print unused program space )
 h: normal-running hi quit ;                                ( -- : boot word )
-\ h: validate over cfa <> if drop-0 exit then nfa ; ( pwd cfa -- nfa | 0 )
-\ h: address $1FFF and ; ( u -- u : mask off address bits )
-\ h: search-for-cfa ( wid cfa -- nfa | 0 : search for CFA in a word list )
-\   cells address >r
-\   begin
-\     dup
-\   while
-\     dup@ over r@ -rot  within
-\     if dup@ r@ validate ?dup if rdrop nip exit then then
-\     @
-\   repeat rdrop ;
-\ h: name ( cwf -- a | 0 )
-\    >r
-\    get-order
-\    begin
-\      dup
-\    while
-\      swap r@ search-for-cfa ?dup if >r 1- ndrop r> rdrop exit then
-\    1- repeat rdrop ;
-\ h: ?instruction ( i m e -- i t )
-\    >r over-and r> = ;
-\ ( a -- : find word by address, and print )
-\ h: .name dup address cells 5u.r space  ( a -- )
-\          name ?dup if word.count type then ;
-\ h: .instruction                    ( u -- : decompile a single instruction )
-\    0x8000  0x8000 ?instruction if [char] L emit $7FFF and 5u.r exit then
-\     $6000   $6000 ?instruction if [char] A emit  drop ( .alu ) exit then
-\     $6000   $4000 ?instruction if [char] C emit .name exit then
-\     $6000   $2000 ?instruction if [char] Z emit .name exit then
-\    [char] B emit .name ;
-\ h: decompiler ( previous current -- : decompile starting at address )
-\   >r
-\   begin dup r@ u< while
-\     d5u.r colon-space
-\     dup@
-\     d5u.r space .instruction cr cell+
-\   repeat rdrop drop ;
-\ : see ( --, <string> : decompile a word )
-\   token (find) ?not-found
-\   swap      2dup= if drop here then >r
-\   cr colon-space dup .id dup cr
-\   cfa r> decompiler space [char] ; emit
-\   dup compile-only? if ."  compile-only" then
-\   dup inline?       if ."  inline"       then
-\       immediate?    if ."  immediate"    then cr ;
+h: validate over cfa <> if drop-0 exit then nfa ; ( pwd cfa -- nfa | 0 )
+h: address $0FFF and ; ( u -- u : mask off address bits )
+h: search-for-cfa ( wid cfa -- nfa | 0 : search for CFA in a word list )
+  cells address >r
+  begin
+    dup
+  while
+    dup@ over r@ -rot  within
+    if dup@ r@ validate ?dup if rdrop nip exit then then
+    @
+  repeat rdrop ;
+h: name ( cwf -- a | 0 )
+   >r
+   get-order
+   begin
+     dup
+   while
+     swap r@ search-for-cfa ?dup if >r 1- ndrop r> rdrop exit then
+   1- repeat rdrop ;
+h: ?instruction ( i m e -- i t )
+   >r over-and r> = ;
+( a -- : find word by address, and print )
+h: .name dup address cells 5u.r space  ( a -- )
+         name ?dup if word.count type then ;
+h: .instruction                    ( u -- : decompile a single instruction )
+   0x8000  0x8000 ?instruction if [char] L emit $7FFF and 5u.r exit then
+    $3000   $3000 ?instruction if [char] A emit  drop ( .alu ) exit then
+    $3000   $2000 ?instruction if [char] C emit .name exit then
+    $3000   $1000 ?instruction if [char] Z emit .name exit then
+   [char] B emit .name ;
+h: decompiler ( previous current -- : decompile starting at address )
+  >r
+  begin dup r@ u< while
+    d5u.r colon-space
+    dup@
+    d5u.r space .instruction cr cell+
+  repeat rdrop drop ;
+: see ( --, <string> : decompile a word )
+  token (find) ?not-found
+  swap      2dup= if drop here then >r
+  cr colon-space dup .id dup cr
+  cfa r> decompiler space [char] ; emit
+  dup compile-only? if ."  compile-only" then
+  dup inline?       if ."  inline"       then
+      immediate?    if ."  immediate"    then cr ;
 : .s ( -- ) cr sp@ for aft r@ pick . then next ."  <sp" cr ; ( -- )
 h: dm+ chars for aft dup@ 5u.r cell+ then next ;        ( a u -- a )
 ( h: dc+ chars for aft dup@ space decompile cell+ then next ; ( a u -- a )
