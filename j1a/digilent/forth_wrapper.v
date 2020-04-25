@@ -4,8 +4,8 @@
 
 module forth_wrapper
 #(
-    parameter MEM_INIT_FILE = "/home/andyr/git/vivado/src/swapforth/j1a/digilent/image.hex",
-    parameter LOG2ABITS=12,
+    parameter MEM_INIT_FILE = "/home/andyr/git/vivado/src/swapforth/j1a/build/nuc.hex",
+    parameter LOG2ABITS=13, // 16k words == 32k bytes
     parameter DWIDTH = 16
 )
 (

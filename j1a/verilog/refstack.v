@@ -1,3 +1,5 @@
+`timescale 1 ns / 1 ps
+
 module refstack #(
     parameter WIDTH = 16,
     parameter DEPTHLOG2 = 3

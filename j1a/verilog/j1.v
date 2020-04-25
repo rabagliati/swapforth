@@ -1,6 +1,11 @@
+`timescale 1 ns / 1 ps
+
 `default_nettype none
-`define WIDTH 16
-`define BRANCHWIDTH 11
+`define DWIDTH 16
+// limited code space, because of instruction format
+`define AWIDTH 12
+// 32k bytes = 16k words of actual RAM, addressable from port B only
+`define LOG2ABITS 14
 
 //Stealing from
 
@@ -25,20 +30,20 @@ module j1
 ) (
     input wire clk,
 
-    output wire [15:0] mem_addr,
+    output wire [`LOG2ABITS-1:0] mem_addr,
     output wire mem_wr,
-    output wire [`WIDTH-1:0] dout,
+    output wire [`DWIDTH-1:0] dout,
 
-    input  wire [`WIDTH-1:0] din,
+    input  wire [`DWIDTH-1:0] din,
 
-    output wire [12:0] code_addr,
-    input  wire [15:0] insn,            // instruction
+    output wire [`LOG2ABITS-1:0] code_addr,    // only 1/8 address space useable
+    input  wire [`DWIDTH-1:0] insn,            // instruction
     input wire reset
 );
 
 //  the kings of the road
-reg [`WIDTH-1:0] st0, st0N;             // top of data stack
-reg [12:0] pc /* verilator public_flat */, pcN;           // program counter
+reg [`DWIDTH-1:0] st0, st0N;             // top of data stack
+reg [`AWIDTH-1:0] pc /* verilator public_flat */, pcN;           // program counter
 
 // The D and R stack controls
 reg dpop, dpush, rpop, rpush;
@@ -89,12 +94,12 @@ reg [DSTACKLOG2:0] depth, rdepth;      // one bit longer, DEBUG
 //
 
 // closely track the Kings above
-wire [`WIDTH-1:0] st1, rst0;
+wire [`DWIDTH-1:0] st1, rst0;
 wire [12:0] pc_plus_1 = pc + 13'd1;
 
-wire [`WIDTH-1:0] rstkD;      // return stack write value
+wire [`DWIDTH-1:0] rstkD;      // return stack write value
 
-wire [`WIDTH:0] minus = {1'b1, ~st0} + st1 + 1;     // extra msb bit
+wire [`DWIDTH:0] minus = {1'b1, ~st0} + st1 + 1;     // extra msb bit
 
 wire signedless = st0[15] ^ st1[15] ? st1[15] : minus[16];
 
@@ -104,9 +109,11 @@ wire is_alu     = (insn[15:12] == 4'b0011);
 wire is_call    = (insn[15:12] == 4'b0010);
 wire is_branch0 = (insn[15:12] == 4'b0001);
 wire is_branch  = (insn[15:12] == 4'b0000);
-wire [`BRANCHWIDTH:0] branchaddr = insn[`BRANCHWIDTH:0];
+wire [`AWIDTH-1:0] branchaddr = insn[`AWIDTH-1:0];
 
-wire [4:0] alu_op = insn[`BRANCHWIDTH:7];
+wire [`AWIDTH:0] debugaddr = {pcN[`AWIDTH-1:0], 1'b0}; // DEBUG
+
+wire [4:0] alu_op = insn[`AWIDTH-1:7];
 wire func_N2A = insn[6];
 wire func_T2R = insn[5];
 wire func_T2N = insn[4];
@@ -123,14 +130,14 @@ wire zero           = (st0 == 0);
 // module outputs, after that introduction
 //
 assign mem_addr = st0;          // read and write memory always addressed by T
-assign code_addr = pcN;         // next instruction fetch
+assign code_addr = {{(`LOG2ABITS-`AWIDTH){1'b0}}, pcN};         // next instruction fetch
 
 assign mem_wr = !reboot & is_ram_write;
 assign dout = st1;                              // we always write from N
 
 // if call is not pushing an address, we write from T, if at all
 assign rstkD = (is_call) ?                      // call
-    {{(`WIDTH - `BRANCHWIDTH - 2){1'b0}}, pc_plus_1, 1'b0}    // pc, word boundary
+    {{(`DWIDTH - `AWIDTH - 2){1'b0}}, pc_plus_1, 1'b0}    // pc, word boundary
     : st0;                                      // T2R
 
 // The D and R stacks
@@ -175,21 +182,21 @@ always @* begin                       // Compute the new value of st0
             5'b00101: st0N = st0 ^ st1;                             // T^N
             5'b00110: st0N = ~st0;                                  // ~T
 
-            5'b00111: st0N = {`WIDTH{equal}};                       // N=T
-            5'b01000: st0N = {`WIDTH{more}};                        // N<T
+            5'b00111: st0N = {`DWIDTH{equal}};                       // N=T
+            5'b01000: st0N = {`DWIDTH{more}};                        // N<T
 
-            5'b01001: st0N = {st0[`WIDTH - 1], st0[`WIDTH - 1:1]};  // T>>1 (a)
+            5'b01001: st0N = {st0[`DWIDTH-1], st0[`DWIDTH-1:1]};  // T>>1 (a)
             5'b01010: st0N = st0 - 1;                               // T-1
             5'b01011: st0N = rst0;                                  // R
             5'b01100: st0N = din;                                   // [T]
-            5'b01101: st0N = {st0[`WIDTH - 2:0], 1'b0};             // T<<1
+            5'b01101: st0N = {st0[`DWIDTH-2:0], 1'b0};             // T<<1
             5'b01110: st0N = {3'b0, depth, 3'b0, rdepth};         // debug
-            5'b01111: st0N = {`WIDTH{umore}};                       // u<
-            default:  st0N = {`WIDTH{1'bx}};
+            5'b01111: st0N = {`DWIDTH{umore}};                       // u<
+            default:  st0N = {`DWIDTH{1'bx}};
         endcase
     end
     else
-        st0N = {`WIDTH{1'bx}};
+        st0N = {`DWIDTH{1'bx}};
 end
 
 always @* begin                                 // stacks, pc
