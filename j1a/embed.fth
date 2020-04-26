@@ -3061,6 +3061,8 @@ h: bist ( -- u : built in self test )
 \ order and reset the variable stack.
 
 h: cold ( -- : performs a cold boot  )
+hex 12 99 !
+14 @ 12 @ + 12 !
    bist ?dup if negate dup yield!? exit then
 \  $10 retrieve z
 \  $10 block b/buf 0 fill
@@ -3156,13 +3158,16 @@ h: name ( cwf -- a | 0 )
 
 h: neg? dup 2 and if $FFFE or then ;
 h: .alu  ( u -- )
-  dup 8 rshift $1F and 5u.r space
-  dup $80 and if ." t->n  " then
-  dup $40 and if ." t->r  " then
-  dup $20 and if ." n->t  " then
-  dup $10 and if ." r->pc " then
-  dup $0C and [char] r emit 2 rshift neg? . space
-      $03 and [char] d emit          neg? . ;
+  [char] a emit
+  dup 8 rshift $F and 5u.r space
+  dup $40 and if ." t2n  " then
+  dup $20 and if ." t2r  " then
+  dup $10 and if ." n2a  " then
+  dup $08 and if ." r2pc " then
+  dup $08 and if ." rpop " then
+  dup $04 and if ." rpsh " then
+  dup $02 and if ." dpop " then
+  dup $01 and if ." dpsh " then ;
 
 h: ?instruction ( i m e -- i t )
    >r over-and r> = ;
@@ -3172,13 +3177,14 @@ h: .name dup address cells 5u.r space  ( a -- )
          name ?dup if word.count type then ;
 h: .instruction                    ( u -- : decompile a single instruction )
    0x8000  0x8000 ?instruction if [char] L emit $7FFF and 5u.r exit then
-    $3000   $3000 ?instruction if [char] A emit  drop ( .alu ) exit then
+    $3000   $3000 ?instruction if [char] a emit  .alu exit then
     $3000   $2000 ?instruction if [char] C emit .name exit then
     $3000   $1000 ?instruction if [char] Z emit .name exit then
    [char] B emit .name ;
 
 h: decompiler ( previous current -- : decompile starting at address )
   >r
+  ." TESTING "
   begin dup r@ u< while
     d5u.r colon-space
     dup@
@@ -3246,7 +3252,7 @@ h: decompiler ( previous current -- : decompile starting at address )
 (   rdepth for aft u. then next ; )
 
 
-: .s depth begin ?dup while dup pick . 1- repeat ."  <sp" cr ; ( -- )
+( : .s depth begin ?dup while dup pick . 1- repeat ."  <sp" cr ; )  ( -- )
 h: dm+ chars for aft dup@ 5u.r cell+ then next ;        ( a u -- a )
 ( h: dc+ chars for aft dup@ space decompile cell+ then next ; ( a u -- a )
 

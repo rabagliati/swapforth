@@ -52,11 +52,9 @@ end
 always #5 clk = (clk === 1'b0);
 
 initial begin
-    @(posedge clk);
-    @(posedge clk); reset = 1;
-    @(posedge clk); @(posedge clk); @(posedge clk);
+    reset = 1;
     @(posedge clk); reset = 0;
-    #100 $finish;
+    #160 $finish;
 end
 
 endmodule // top
