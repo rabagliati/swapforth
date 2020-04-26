@@ -1,4 +1,4 @@
-\ # embed.fth
+\# embed.fth
 \
 \	| Project    | A Small Forth VM/Implementation   |
 \	| ---------- | --------------------------------- |
@@ -704,6 +704,7 @@ hide t;
 ]asm #~t              ALU asm[ constant =invert ( invert instruction )
 ]asm #t  r->pc  rpop  ALU asm[ constant =exit   ( return/exit instruction )
 ]asm #n  t->r dpop rpsh ALU asm[ constant =>r     ( to r. stk. instruction )
+
 $20   constant =bl         ( blank, or space )
 $D    constant =cr         ( carriage return )
 $A    constant =lf         ( line feed )
@@ -909,6 +910,10 @@ xchange _system _forth-wordlist
 : dup      dup      ; ( n -- n n : duplicate value on top of stack )
 : over     over     ; ( n1 n2 -- n1 n2 n1 : duplicate second value on stack )
 : invert   invert   ; ( u -- u : bitwise invert of value on top of stack )
+xchange _forth-wordlist _system
+: um+      um+      ; ( u u -- u carry : addition with carry )
+: um*      um*      ; ( u u -- ud : multiplication  )
+xchange _system _forth-wordlist
 : +        +        ; ( u u -- u : addition without carry )
 : swap     swap     ; ( n1 n2 -- n2 n1 : swap two values on stack )
 : nip      nip      ; ( n1 n2 -- n2 : remove second item on stack )
@@ -947,15 +952,14 @@ xchange _system _forth-wordlist
 \ to implement an add with carry, or *um+*. Once this is available, *um/mod*
 \ and *um\** are coded.
 \
-: um+ ( w w -- w carry )
-        over over + >r
-        r@ 0 < invert >r
-        over over and
-        0 < r> or >r
-        or 0 < r> and invert 1 +
-        r> swap ;
-\
-\       $F constant #highest
+\ : um+ ( w w -- w carry )
+\         over over + >r
+\         r@ 0 < invert >r
+\         over over and
+\         0 < r> or >r
+\         or 0 < r> and invert 1 +
+\         r> swap ;
+
 \       : um/mod ( ud u -- r q )
 \         ?dup 0= if $A -throw exit then
 \         2dup u<
@@ -975,11 +979,11 @@ xchange _system _forth-wordlist
 \         >r dup 0< if r@ + then r> um/mod r>
 \         if swap negate swap exit then ;
 \
-: um* ( u u -- ud )
-        0 swap ( u1 0 u2 ) #highest
-        for dup um+ >r >r dup um+ r> + r>
-           if >r over um+ r> + then
-        next rot-drop ;
+\ : um* ( u u -- ud )
+\        0 swap ( u1 0 u2 ) #highest
+\        for dup um+ >r >r dup um+ r> + r>
+\           if >r over um+ r> + then
+\        next rot-drop ;
 \
 \ The other arithmetic operations follow from the previous definitions almost
 \ trivially:
@@ -1109,7 +1113,7 @@ h: ?exit if rdrop exit then ; ( u --, R: xt -- xt| : conditional return )
 h: over- over - ;           ( u u -- u u )
 h: over+ over + ;           ( u1 u2 -- u1 u1+2 )
 : aligned dup first-bit + ; ( b -- a )
-: bye 0 [-1] yield!? ( $38 -throw ) ; ( -- : leave the interpreter )
+: bye 0 [-1] ( yield!? $38 -throw ) ; ( -- : leave the interpreter )
 h: cell- cell - ;           ( a -- a : adjust address to previous cell )
 : cell+  cell + ;           ( a -- a : move address forward to next cell )
 : cells t<<1 ;              ( n -- n : convert cells count to address count )
@@ -1141,7 +1145,7 @@ h: tib source drop ;                  ( -- a )
 : source-id id @ ;                    ( -- 0 | -1 )
 : rot >r swap r> swap ;               ( n1 n2 n3 -- n2 n3 n1 )
 : -rot rot rot ;                      ( n1 n2 n3 -- n3 n1 n2 )
-: um+ 2dup u< 0= if swap then over+ swap over swap u< 1 and ; ( u u -- u w )
+\ : um+ 2dup u< 0= if swap then over+ swap over swap u< 1 and ; ( u u -- u w )
 h: rot-drop rot drop ;                ( n1 n2 n3 -- n2 n3 )
 h: d0= or 0= ;                        ( d -- t )
 h: dnegate invert >r invert 1 um+ r> + ; ( d -- d )
@@ -1476,10 +1480,10 @@ h: $type [-1] typist ;                   ( b u --  )
   r> drop-0 ;
 : throw ( k*x n -- k*x | i*x n )
   ?dup if
-    ( handler @ rp! )
+    drop ( handler @ rp! )
     r> handler !
     rxchg ( *rxchg* is equivalent to 'r> swap >r' )
-    drop ( was: sp! ) drop r>         ( was: sp@ swap - ndrop r> )
+    drop ( was: sp! ) drop r>
   then ;
 
 \ Negative numbers take up two cells in a word definition when compiled into
@@ -2162,7 +2166,7 @@ h: parser ( b u c -- b u delta )
 : .( [char] ) parse type ; ( print out text until matching parenthesis )
 : \ #tib @ in! ; immediate ( comment until new line )
 h: ?length dup word-length u< ?exit $13 -throw ;
-: word 1depth parse ?length here pack$ ; ( c -- a ; <string> )
+: word drop ( 1depth ) parse ?length here pack$ ; ( c -- a ; <string> )
 h: token =bl word ;                      ( -- a )
 : char token count drop c@ ;             ( -- c; <string> )
 \ : $ base@ >r hex token count number? 0= throw drop r> base! ; ( word -- n )
@@ -2401,7 +2405,7 @@ xchange _system _forth-wordlist
 : ] [-1] state !    ;                                ( -- : compile mode )
 : [      state zero ; immediate                      ( -- : command mode )
 
-h: empty sp0 sp! ; ( 0..n -- : empty variable stack )
+h: empty ; ( sp0 sp! ) ( 0..n -- : empty variable stack )
 h: ?error ( n -- : perform actions on error )
   ?dup 0= ?exit
   .             ( print error number )
@@ -2417,7 +2421,7 @@ h: eval ( -- : evaluation loop, get token, evaluate, loop, prompt )
   begin
     token dup c@
   while
-    interpret 0 ?depth
+    interpret 0 ( ?depth )
   repeat drop <ok> @execute ;
 
 \ *quit* can now be defined, it sets up the input line variables, sets the
@@ -2649,9 +2653,9 @@ xchange _system _forth-wordlist
 \
 
 xchange _forth-wordlist _system
-h: trace-execute cpu! >r ; ( u xt -- )
-: trace ( "name" -- : trace a word )
-  find-cfa ( cpu@ ) 0 dup>r 1 or ( ' ) trace-execute ( catch ) r> cpu! ( throw ) ;
+\ h: trace-execute cpu! >r ; ( u xt -- )
+\ : trace ( "name" -- : trace a word )
+\   find-cfa ( cpu@ ) 0 dup>r 1 or ( ' ) trace-execute ( catch ) r> cpu! ( throw ) 
 xchange _system _forth-wordlist
 
 \ Annotated example output of running *trace* on *+* is shown (excluding
@@ -2873,7 +2877,7 @@ h: +block blk-@ + ;           ( -- )
 : flush block-dirty @ 0= ?exit 0 [-1] -save ; ( -- )
 
 : block ( k -- a )
-  1depth
+  ( 1depth )
   dup $3F u> if $23 -throw exit then
   dup blk !
   $A lshift ( <-- b/buf * ) ;
@@ -3063,7 +3067,7 @@ h: cold ( -- : performs a cold boot  )
    $12 retrieve io!
    forth
    empty
-   rp0 rp!
+   ( rp0 rp! )
    <boot> @execute ;
 
 \ *hi* prints out the welcome message, the version number, sets the numeric
