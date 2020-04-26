@@ -666,7 +666,7 @@ a: return ( -- : Compile a return into the target )
 : sp@      ]asm #sp@    t->n              dpsh alu asm[ ;
 : 1-       ]asm #t-1                           alu asm[ ;
 \ : rp@      ]asm #rp@    t->n              dpsh alu asm[ ;
-: rp@      ]asm #t                             alu asm[ ;
+: rp@      ]asm #t                        dpsh alu asm[ ;
 
 \ : 0=       ]asm #t==0                          alu asm[ ;
 
@@ -930,7 +930,7 @@ xchange _forth-wordlist _system
 : (save)   drop drop 99 ; ( u1 u2 -- u : save memory from u1 to u2 inclusive )
 : vm       vm       ; ( ??? -- ??? : perform arbitrary VM call )
 xchange _system _forth-wordlist
-( : um/mod   um/mod   ;  d  u2 -- rem div : mixed unsigned divide/modulo )
+: um/mod   um/mod   ;  ( d  u2 -- rem div : mixed unsigned divide/modulo )
 ( : /mod     /mod     ;  u1 u2 -- rem div : signed divide/modulo )
 ( : /        /        ;  u1 u2 -- u : u1 divided by u2 )
 ( : mod      mod      ;  u1 u2 -- u : remainder of u1 divided by u2 )
@@ -947,13 +947,13 @@ xchange _system _forth-wordlist
 \ to implement an add with carry, or *um+*. Once this is available, *um/mod*
 \ and *um\** are coded.
 \
-\       : um+ ( w w -- w carry )
-\         over over + >r
-\         r@ 0 < invert >r
-\         over over and
-\         0 < r> or >r
-\         or 0 < r> and invert 1 +
-\         r> swap ;
+: um+ ( w w -- w carry )
+        over over + >r
+        r@ 0 < invert >r
+        over over and
+        0 < r> or >r
+        or 0 < r> and invert 1 +
+        r> swap ;
 \
 \       $F constant #highest
 \       : um/mod ( ud u -- r q )
@@ -975,11 +975,11 @@ xchange _system _forth-wordlist
 \         >r dup 0< if r@ + then r> um/mod r>
 \         if swap negate swap exit then ;
 \
-\       : um* ( u u -- ud )
-\         0 swap ( u1 0 u2 ) #highest
-\         for dup um+ >r >r dup um+ r> + r>
-\           if >r over um+ r> + then
-\         next rot-drop ;
+: um* ( u u -- ud )
+        0 swap ( u1 0 u2 ) #highest
+        for dup um+ >r >r dup um+ r> + r>
+           if >r over um+ r> + then
+        next rot-drop ;
 \
 \ The other arithmetic operations follow from the previous definitions almost
 \ trivially:
@@ -1395,10 +1395,6 @@ h: colon-space [char] : emit space ;   ( -- )
 : pick ?dup if swap >r 1- pick r> swap exit then dup ;
 \
 
-h: vrelative sp@ swap - ;  ( u -- u : position relative to sp )
-: depth sp0 vrelative cell- chars ; ( -- u : get current depth )
-: pick cells vrelative @ ;          ( vn...v0 u -- vn...v0 vu )
-
 \ *ndrop* removes a variable number of items off the variable stack, which
 \ is sometimes needed for cleaning things up before exiting a word.
 \ h: ndrop cells vrelative sp! drop ; ( 0u...nu n -- : drop n cells )
@@ -1480,10 +1476,10 @@ h: $type [-1] typist ;                   ( b u --  )
   r> drop-0 ;
 : throw ( k*x n -- k*x | i*x n )
   ?dup if
-    handler @ rp!
+    ( handler @ rp! )
     r> handler !
     rxchg ( *rxchg* is equivalent to 'r> swap >r' )
-    sp! drop r>         ( was: sp@ swap - ndrop r> )
+    drop ( was: sp! ) drop r>         ( was: sp@ swap - ndrop r> )
   then ;
 
 \ Negative numbers take up two cells in a word definition when compiled into
@@ -1512,8 +1508,8 @@ h: -throw negate throw ;  ( u -- : negate and throw )
 \ quickly with minimal overhead in speed and size by selecting only a few
 \ words to put depth checking in.
 
-h: 1depth 1 fallthrough; ( ??? -- : check depth is at least one )
-h: ?depth depth < ?exit 4 -throw ; ( ??? n -- check depth )
+\ h: 1depth 1 fallthrough; ( ??? -- : check depth is at least one )
+\ h: ?depth depth < ?exit 4 -throw ; ( ??? n -- check depth )
 
 \
 \ ## Numeric Output
@@ -1620,7 +1616,7 @@ h: digit 9 over < 7 and + [char] 0 + ;         ( u -- c )
 \
 
 : #> 2drop hld @ pad over- ;                ( w -- b u )
-: #  2 ?depth 0 base@ extract digit hold ;  ( d -- d )
+: #  ( 2 ?depth ) 0 base@ extract digit hold ;  ( d -- d )
 : #s begin # 2dup d0= until ;               ( d -- 0 )
 : <# pad hld ! ;                            ( -- )
 
@@ -1797,7 +1793,7 @@ h: drop-nip-dup drop nip dup ;
 \
 
 h: ktap? dup =bl - 95 u< swap =del <> and ; ( c -- t : possible ktap? )
-h: raw? cpu@ 2 and 0<> ; ( c -- t : raw terminal mode? )
+h: raw? ( cpu@ ) 0 2 and 0<> ; ( c -- t : raw terminal mode? )
 : accept ( b u -- b u )
   over+ over
   begin
@@ -2388,7 +2384,7 @@ h: (ok) state@ ?exit ."  ok" cr ;  ( -- : default state aware prompt )
 
 h: preset tib-start #tib cell+ ! 0 in! id zero ;  ( -- : reset input )
 
-h: quite? 4 cpu@ and 0<> ; ( -- t : are we operating in quite mode? )
+h: quite? 4 ( cpu@ ) 0 and 0<> ; ( -- t : are we operating in quite mode? )
 : io! preset fallthrough;  ( -- : initialize I/O )
 h: console ' rx? <key> ! ' tx! <emit> ! fallthrough;
 h: hand
@@ -2655,7 +2651,7 @@ xchange _system _forth-wordlist
 xchange _forth-wordlist _system
 h: trace-execute cpu! >r ; ( u xt -- )
 : trace ( "name" -- : trace a word )
-  find-cfa cpu@ dup>r 1 or ( ' ) trace-execute ( catch ) r> cpu! ( throw ) ;
+  find-cfa ( cpu@ ) 0 dup>r 1 or ( ' ) trace-execute ( catch ) r> cpu! ( throw ) ;
 xchange _system _forth-wordlist
 
 \ Annotated example output of running *trace* on *+* is shown (excluding
