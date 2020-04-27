@@ -113,7 +113,7 @@ wire [`AWIDTH-1:0] branchaddr = insn[`AWIDTH-1:0];
 
 wire [`AWIDTH:0] debugaddr = {pcN[`AWIDTH-1:0], 1'b0}; // DEBUG
 
-wire [4:0] alu_op = insn[`AWIDTH-1:7];
+wire [3:0] alu_op = insn[`AWIDTH-1:8];
 wire func_T2R = is_alu & insn[7];
 wire func_T2N = is_alu & insn[6];
 wire func_N2A = is_alu & insn[5];
@@ -177,24 +177,24 @@ always @* begin                       // Compute the new value of st0
         st0N = st1;                                // pop condition
     else if (is_alu) begin                         // ALU operations...
         casez (alu_op)
-            5'b00000: st0N = st0;                                   // T
-            5'b00001: st0N = st1;                                   // N
-            5'b00010: st0N = st0 + st1;                             // T+N
-            5'b00011: st0N = st0 & st1;                             // T&N
-            5'b00100: st0N = st0 | st1;                             // T|N
-            5'b00101: st0N = st0 ^ st1;                             // T^N
-            5'b00110: st0N = ~st0;                                  // ~T
+            4'b0000: st0N = st0;                                   // T
+            4'b0001: st0N = st1;                                   // N
+            4'b0010: st0N = st0 + st1;                             // T+N
+            4'b0011: st0N = st0 & st1;                             // T&N
+            4'b0100: st0N = st0 | st1;                             // T|N
+            4'b0101: st0N = st0 ^ st1;                             // T^N
+            4'b0110: st0N = ~st0;                                  // ~T
 
-            5'b00111: st0N = {`DWIDTH{equal}};                      // N=T
-            5'b01000: st0N = {`DWIDTH{more}};                       // N<T
+            4'b0111: st0N = {`DWIDTH{equal}};                      // N=T
+            4'b1000: st0N = {`DWIDTH{more}};                       // N<T
 
-            5'b01001: st0N = {st0[`DWIDTH-1], st0[`DWIDTH-1:1]};    // T>>1 (a)
-            5'b01010: st0N = st0 - 1;                               // T-1
-            5'b01011: st0N = rst0;                                  // R
-            5'b01100: st0N = din;                                   // [T]
-            5'b01101: st0N = {st0[`DWIDTH-2:0], 1'b0};              // T<<1
-            5'b01110: st0N = {3'b0, depth, 3'b0, rdepth};           // debug
-            5'b01111: st0N = {`DWIDTH{umore}};                      // u<
+            4'b1001: st0N = {st0[`DWIDTH-1], st0[`DWIDTH-1:1]};    // T>>1 (a)
+            4'b1010: st0N = st0 - 1;                               // T-1
+            4'b1011: st0N = rst0;                                  // R
+            4'b1100: st0N = din;                                   // [T]
+            4'b1101: st0N = {st0[`DWIDTH-2:0], 1'b0};              // T<<1
+            4'b1110: st0N = {3'b0, depth, 3'b0, rdepth};           // debug
+            4'b1111: st0N = {`DWIDTH{umore}};                      // u<
             default:  st0N = st0;                                   // NOTREACHED
         endcase
     end
@@ -236,7 +236,7 @@ always @* begin                                 // stacks, pc
     if (reboot)
         pcN = 0;
     else if (func_R2P)
-        pcN = rst0;                 // return
+        pcN = rst0[`AWIDTH:1];      // return, shift right
     else if (~|st0)                 // branch not taken
         pcN = pc_plus_1;
     else if (is_branch | is_call | is_branch0)
