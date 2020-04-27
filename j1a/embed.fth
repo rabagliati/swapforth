@@ -3061,7 +3061,7 @@ h: bist ( -- u : built in self test )
 \ order and reset the variable stack.
 
 h: cold ( -- : performs a cold boot  )
-hex 12 99 !
+hex 99 12 !
 14 @ 12 @ + 12 !
    bist ?dup if negate dup yield!? exit then
 \  $10 retrieve z
@@ -3254,7 +3254,7 @@ h: decompiler ( previous current -- : decompile starting at address )
 
 ( : .s depth begin ?dup while dup pick . 1- repeat ."  <sp" cr ; )  ( -- )
 h: dm+ chars for aft dup@ 5u.r cell+ then next ;        ( a u -- a )
-( h: dc+ chars for aft dup@ space decompile cell+ then next ; ( a u -- a )
+h: dc+ chars for aft dup@ space decompile cell+ then next ; ( a u -- a )
 
 : dump ( a u -- )
   $10 + \ align up by dump-width
