@@ -1,7 +1,9 @@
+# I want word offsets in my hex dump
+
 build/nuc.hex: embed.fth
 	/home/andyr/git/embed/embed -o build/nuc.bin embed.fth
-	od -Ax -tx2z -w16 -v build/nuc.bin > build/nuc.txt
 	od -An -tx2 -w2 -v build/nuc.bin > build/nuc.hex
+	od -Ax -tx2z -w16 -v build/nuc.bin | perl -f wordaddr.pl > build/nuc.txt
 
 bootstrap: build/nuc.hex mkrom.py verilator/bootstrap
 	make -C verilator

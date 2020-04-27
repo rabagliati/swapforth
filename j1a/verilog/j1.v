@@ -148,7 +148,7 @@ assign dout = st1;                              // we always write from N
 
 // if call is not pushing an address, we write from T, if at all
 assign rstkD = (is_call) ?                      // call
-    {{(`DWIDTH - `ADDRWIDTH - 2){1'b0}}, pc_plus_1, 1'b0}    // pc, word boundary
+    {{(`DWIDTH - `ADDRWIDTH - 2){1'b0}}, pc_plus_1}    // pc, word boundary
     : st0;                                      // T2R
 
 // The D and R stacks
@@ -253,8 +253,6 @@ always @* begin                                 // stacks, pc
         pcN = branchaddr;
     else
         pcN = pc_plus_1;
-    depth = depth + dpush - dpop;   // debug
-    rdepth = rdepth + rpush - rpop; // debug
 end
 
 always @(posedge clk)
@@ -263,12 +261,14 @@ begin
         reboot <= 1'b1;
         pc  <= 0;
         st0 <= 0;
-        depth = 0;                  // debug
-        rdepth = 0;                 // debug
+        depth <= 4'b0000;                  // debug
+        rdepth <= 4'b0000;                 // debug
     end else begin
         reboot <= 0;
         pc <= pcN;
         st0 <= st0N;
+        depth <= depth + dpush - dpop;   // debug
+        rdepth <= rdepth + rpush - rpop; // debug
     end
 end
 
