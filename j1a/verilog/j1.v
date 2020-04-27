@@ -4,7 +4,7 @@
 `define DWIDTH 16
 // limited code space, because of instruction format
 `define AWIDTH 12
-// 32k bytes = 16k words of actual RAM, addressable from port B only
+// 32k bytes = 16k words of actual RAM, top addressable from port B only
 `define LOG2ABITS 14
 
 //Stealing from
@@ -114,9 +114,10 @@ wire [`AWIDTH-1:0] branchaddr = insn[`AWIDTH-1:0];
 wire [`AWIDTH:0] debugaddr = {pcN[`AWIDTH-1:0], 1'b0}; // DEBUG
 
 wire [4:0] alu_op = insn[`AWIDTH-1:7];
-wire func_N2A = insn[6];
-wire func_T2R = insn[5];
-wire func_T2N = insn[4];
+wire func_T2R = is_alu & insn[7];
+wire func_T2N = is_alu & insn[6];
+wire func_N2A = is_alu & insn[5];
+wire func_R2P = is_alu & insn[4];
 
 
 wire is_ram_write   = (is_alu & func_N2A);
@@ -168,11 +169,13 @@ refstack #(
 always @* begin                       // Compute the new value of st0
     if (is_lit)
         st0N = {1'b0, insn[14:0]};            // literal
+    else if (is_special)
+        st0N = st0;
     else if (is_branch | is_call)
         st0N = st0;
     else if (is_branch0)
         st0N = st1;                                // pop condition
-    else if (is_alu) begin                            // ALU operations...
+    else if (is_alu) begin                         // ALU operations...
         casez (alu_op)
             5'b00000: st0N = st0;                                   // T
             5'b00001: st0N = st1;                                   // N
@@ -182,63 +185,66 @@ always @* begin                       // Compute the new value of st0
             5'b00101: st0N = st0 ^ st1;                             // T^N
             5'b00110: st0N = ~st0;                                  // ~T
 
-            5'b00111: st0N = {`DWIDTH{equal}};                       // N=T
-            5'b01000: st0N = {`DWIDTH{more}};                        // N<T
+            5'b00111: st0N = {`DWIDTH{equal}};                      // N=T
+            5'b01000: st0N = {`DWIDTH{more}};                       // N<T
 
-            5'b01001: st0N = {st0[`DWIDTH-1], st0[`DWIDTH-1:1]};  // T>>1 (a)
+            5'b01001: st0N = {st0[`DWIDTH-1], st0[`DWIDTH-1:1]};    // T>>1 (a)
             5'b01010: st0N = st0 - 1;                               // T-1
             5'b01011: st0N = rst0;                                  // R
             5'b01100: st0N = din;                                   // [T]
-            5'b01101: st0N = {st0[`DWIDTH-2:0], 1'b0};             // T<<1
-            5'b01110: st0N = {3'b0, depth, 3'b0, rdepth};         // debug
-            5'b01111: st0N = {`DWIDTH{umore}};                       // u<
-            default:  st0N = {`DWIDTH{1'bx}};
+            5'b01101: st0N = {st0[`DWIDTH-2:0], 1'b0};              // T<<1
+            5'b01110: st0N = {3'b0, depth, 3'b0, rdepth};           // debug
+            5'b01111: st0N = {`DWIDTH{umore}};                      // u<
+            default:  st0N = st0;                                   // NOTREACHED
         endcase
     end
     else
-        st0N = {`DWIDTH{1'bx}};
+        st0N = st0;                             // NOTREACHED
 end
 
 always @* begin                                 // stacks, pc
 
-    // default should be no push or pop - that keeps compiler happy
     // ---------------------------------------
     //                      data stack
     if (is_lit)                                 
-        dpush = 1;
+        {dpop, dpush} = 2'b01;
     else if (is_branch0)                        // branch0, pop condition
-        dpop = 1;
-    if (is_alu)
+        {dpop, dpush} = 2'b10;
+    else if (is_alu)
         {dpop, dpush} = insn[1:0];              // out of the instruction
     else if (is_branch | is_call)               // jump, call
         {dpop, dpush} = 2'b00;
     else if (is_special)
-        {dpop, dpush} = 2'b00;                           // nothing
+        {dpop, dpush} = 2'b00;                  // nothing
     else
-        {dpop, dpush} = 2'b00;
+        {dpop, dpush} = 2'b00;                  // NOTREACHED
 
     // ---------------------------------------
     //                      return stack
     //                  if no pop, I think you can peephole optimise by adding
     //
     if (is_call)
-        rpush = 1;                              // push return addr
-    if (is_alu)
+        {rpop, rpush} = 2'b01;                  // push return addr
+    else if (is_alu)
         {rpop, rpush} = insn[3:2];              // out of instruction
     else
-        {rpop, rpush} = 2'b00;                           // nothing
+        {rpop, rpush} = 2'b00;                  // nothing
 
     // ---------------------------------------
     //                      program counter
     //             could put interrupt check here ?
     if (reboot)
         pcN = 0;
-    else if (is_branch | is_call | (is_branch0 & (~|st0)))
+    else if (func_R2P)
+        pcN = rst0;                 // return
+    else if (~|st0)                 // branch not taken
+        pcN = pc_plus_1;
+    else if (is_branch | is_call | is_branch0)
         pcN = branchaddr;
     else
         pcN = pc_plus_1;
-    depth = depth + dpush - dpop;       // debug
-    rdepth = rdepth + rpush - rpop;       // debug
+    depth = depth + dpush - dpop;   // debug
+    rdepth = rdepth + rpush - rpop; // debug
 end
 
 always @(posedge clk)
@@ -247,8 +253,8 @@ begin
         reboot <= 1'b1;
         pc  <= 0;
         st0 <= 0;
-        depth = 0;  // debug
-        rdepth = 0;  // debug
+        depth = 0;                  // debug
+        rdepth = 0;                 // debug
     end else begin
         reboot <= 0;
         pc <= pcN;
