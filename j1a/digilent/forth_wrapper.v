@@ -54,7 +54,7 @@ always #5 clk = (clk === 1'b0);
 initial begin
     reset = 1;
     @(posedge clk); reset = 0;
-    #160 $finish;
+    #250 $finish;
 end
 
 endmodule // top
