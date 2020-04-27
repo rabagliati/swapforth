@@ -1,4 +1,4 @@
-\# embed.fth
+\ embed.fth
 \
 \	| Project    | A Small Forth VM/Implementation   |
 \	| ---------- | --------------------------------- |
@@ -648,13 +648,13 @@ a: return ( -- : Compile a return into the target )
 : over     ]asm #n      t->n              dpsh alu asm[ ;
 : invert   ]asm #~t                            alu asm[ ;
 : +        ]asm #t+n                      dpop alu asm[ ;
-: swap     ]asm #n      t->n                   alu asm[ ;
+: swap     ]asm #n      t->n             dboth alu asm[ ;
 : nip      ]asm #t                        dpop alu asm[ ;
 : drop     ]asm #n                        dpop alu asm[ ;
 : >r       ]asm #n           t->r    rpsh dpop alu asm[ ;
 : r>       ]asm #r      t->n         rpop dpsh alu asm[ ;
 : r@       ]asm #r      t->n              dpsh alu asm[ ;
-: @        ]asm #[t]                           alu asm[ ;
+: @        ]asm #[t]                     dboth alu asm[ ;
 : t>>1     ]asm #t>>1                          alu asm[ ;
 : t<<1     ]asm #t<<1                          alu asm[ ;
 : =        ]asm #t==n                     dpop alu asm[ ;
@@ -3062,7 +3062,7 @@ h: bist ( -- u : built in self test )
 
 h: cold ( -- : performs a cold boot  )
 hex 99 12 !
-14 @ 12 @ + 12 !
+14 @ 12 @ + invert 12 !
    bist ?dup if negate dup yield!? exit then
 \  $10 retrieve z
 \  $10 block b/buf 0 fill
