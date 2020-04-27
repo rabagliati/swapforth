@@ -3,9 +3,20 @@
 `default_nettype none
 `define DWIDTH 16
 // limited code space, because of instruction format
-`define AWIDTH 12
 // 32k bytes = 16k words of actual RAM, top addressable from port B only
-`define LOG2ABITS 14
+// underlying forth machine has expensive byte operations for c@ etc.
+// We are just going to word address memory
+// so we subtract one here. BEWARE
+
+
+// Actual RAM
+`define MEMWIDTH 14
+
+// This is Code addressable space - not all the RAM
+`define ADDRWIDTH 12
+
+// ugh
+`define DIFFERENCE 3
 
 //Stealing from
 
@@ -30,20 +41,21 @@ module j1
 ) (
     input wire clk,
 
-    output wire [`LOG2ABITS-1:0] mem_addr,
+    output wire [`MEMWIDTH-1:0] mem_addr,
     output wire mem_wr,
     output wire [`DWIDTH-1:0] dout,
 
     input  wire [`DWIDTH-1:0] din,
 
-    output wire [`LOG2ABITS-1:0] code_addr,    // only 1/8 address space useable
+    output wire [`MEMWIDTH-1:0] code_addr,    // only 1/8 address space useable
     input  wire [`DWIDTH-1:0] insn,            // instruction
     input wire reset
 );
 
 //  the kings of the road
 reg [`DWIDTH-1:0] st0, st0N;             // top of data stack
-reg [`AWIDTH-1:0] pc /* verilator public_flat */, pcN;           // program counter
+// program counter  - this is one extra because addresses are even
+reg [`ADDRWIDTH:0] pc /* verilator public_flat */, pcN;
 
 // The D and R stack controls
 reg dpop, dpush, rpop, rpush;
@@ -109,11 +121,9 @@ wire is_alu     = (insn[15:12] == 4'b0011);
 wire is_call    = (insn[15:12] == 4'b0010);
 wire is_branch0 = (insn[15:12] == 4'b0001);
 wire is_branch  = (insn[15:12] == 4'b0000);
-wire [`AWIDTH-1:0] branchaddr = insn[`AWIDTH-1:0];
+wire [`ADDRWIDTH-1:0] branchaddr = insn[`ADDRWIDTH-1:0];
 
-wire [`AWIDTH:0] debugaddr = {pcN[`AWIDTH-1:0], 1'b0}; // DEBUG
-
-wire [3:0] alu_op = insn[`AWIDTH-1:8];
+wire [3:0] alu_op = insn[`ADDRWIDTH-1:8];
 wire func_T2R = is_alu & insn[7];
 wire func_T2N = is_alu & insn[6];
 wire func_N2A = is_alu & insn[5];
@@ -130,15 +140,15 @@ wire zero           = (st0 == 0);
 
 // module outputs, after that introduction
 //
-assign mem_addr = st0;          // read and write memory always addressed by T
-assign code_addr = {{(`LOG2ABITS-`AWIDTH){1'b0}}, pcN};         // next instruction fetch
+assign mem_addr = st0[`MEMWIDTH:1];     // read and write memory always addressed by T
+assign code_addr = {3'b0, pcN}; // next instruction fetch
 
 assign mem_wr = !reboot & is_ram_write;
 assign dout = st1;                              // we always write from N
 
 // if call is not pushing an address, we write from T, if at all
 assign rstkD = (is_call) ?                      // call
-    {{(`DWIDTH - `AWIDTH - 2){1'b0}}, pc_plus_1, 1'b0}    // pc, word boundary
+    {{(`DWIDTH - `ADDRWIDTH - 2){1'b0}}, pc_plus_1, 1'b0}    // pc, word boundary
     : st0;                                      // T2R
 
 // The D and R stacks
@@ -236,7 +246,7 @@ always @* begin                                 // stacks, pc
     if (reboot)
         pcN = 0;
     else if (func_R2P)
-        pcN = rst0[`AWIDTH:1];      // return, shift right
+        pcN = {rst0[`ADDRWIDTH:1], 1'b0};      // return, shift right
     else if (~|st0)                 // branch not taken
         pcN = pc_plus_1;
     else if (is_branch | is_call | is_branch0)
