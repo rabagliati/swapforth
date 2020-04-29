@@ -13,7 +13,7 @@
 `define MEMWIDTH 14
 
 // This is Code addressable space - not all the RAM
-`define ADDRWIDTH 12
+`define ADDRWIDTH 13
 
 // ugh
 `define DIFFERENCE 3
@@ -72,13 +72,13 @@ reg [DSTACKLOG2:0] depth, rdepth;      // one bit longer, DEBUG
 //	+---------------------------------------------------------------+
 //	| 0 | 1 |CLR|SET|SCH|ADD| XYorZ | F3+MSK| F2+MSK| F1+MSK|DAT+MSK|
 //	+---------------------------------------------------------------+
-//	| 0 | 0 | 1 | 1 | ALU OPERATION |T2N|T2R|N2A|R2P|PPr|PSH|PPd|PSH|
+//	| 0 | 1 | 1 |       ALU OPERATION   |T2R|N2A|R2P|PPr|PSH|PPd|PSH|
 //	+---------------------------------------------------------------+
-//	| 0 | 0 | 1 | 0 |        CALL TARGET ADDRESS                    |
+//	| 0 | 1 | 0 |            CALL TARGET ADDRESS                    |
 //	+---------------------------------------------------------------+
-//	| 0 | 0 | 0 | 1 |        CONDITIONAL BRANCH TARGET ADDRESS      |
+//	| 0 | 0 | 1 |            CONDITIONAL BRANCH TARGET ADDRESS      |
 //	+---------------------------------------------------------------+
-//	| 0 | 0 | 0 | 0 |        BRANCH TARGET ADDRESS                  |
+//	| 0 | 0 | 0 |            BRANCH TARGET ADDRESS                  |
 //	+---------------------------------------------------------------+
 //	| F | E | D | C | B | A | 9 | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
 //	+---------------------------------------------------------------+
@@ -91,7 +91,6 @@ reg [DSTACKLOG2:0] depth, rdepth;      // one bit longer, DEBUG
 //	CONDITIONAL    : BRANCHS pop and test the T
 //	CALLS          : PC+1 onto the return stack
 //
-//	T2N : Move T to N
 //	T2R : Move T to top of return stack
 //	N2A : STORE N to memory location addressed by T
 //	R2P : Move top of return stack to PC
@@ -116,16 +115,14 @@ wire [`DWIDTH:0] minus = {1'b1, ~st0} + st1 + 1;     // extra msb bit
 wire signedless = st0[15] ^ st1[15] ? st1[15] : minus[16];
 
 wire is_lit     = (insn[15]    == 1'b1);
-wire is_special = (insn[15:14] == 2'b01);
-wire is_alu     = (insn[15:12] == 4'b0011);
-wire is_call    = (insn[15:12] == 4'b0010);
-wire is_branch0 = (insn[15:12] == 4'b0001);
-wire is_branch  = (insn[15:12] == 4'b0000);
+wire is_alu     = (insn[15:13] == 3'b011);
+wire is_call    = (insn[15:13] == 3'b010);
+wire is_branch0 = (insn[15:13] == 3'b001);
+wire is_branch  = (insn[15:13] == 3'b000);
 wire [`ADDRWIDTH-1:0] branchaddr = insn[`ADDRWIDTH-1:0];
 
-wire [3:0] alu_op = insn[`ADDRWIDTH-1:8];
-wire func_T2R = is_alu & insn[7];
-wire func_T2N = is_alu & insn[6];
+wire [4:0] alu_op = insn[`ADDRWIDTH-1:7];
+wire func_T2R = is_alu & insn[6];
 wire func_N2A = is_alu & insn[5];
 wire func_R2P = is_alu & insn[4];
 
@@ -141,7 +138,7 @@ wire zero           = (st0 == 0);
 // module outputs, after that introduction
 //
 assign mem_addr = st0[`MEMWIDTH:1];     // read and write memory always addressed by T
-assign code_addr = {3'b0, pcN}; // next instruction fetch
+assign code_addr = {2'b00, pcN}; // next instruction fetch
 
 assign mem_wr = !reboot & is_ram_write;
 assign dout = st1;                              // we always write from N
@@ -179,32 +176,30 @@ refstack #(
 always @* begin                       // Compute the new value of st0
     if (is_lit)
         st0N = {1'b0, insn[14:0]};            // literal
-    else if (is_special)
-        st0N = st0;
     else if (is_branch | is_call)
         st0N = st0;
     else if (is_branch0)
         st0N = st1;                                // pop condition
     else if (is_alu) begin                         // ALU operations...
         casez (alu_op)
-            4'b0000: st0N = st0;                                   // T
-            4'b0001: st0N = st1;                                   // N
-            4'b0010: st0N = st0 + st1;                             // T+N
-            4'b0011: st0N = st0 & st1;                             // T&N
-            4'b0100: st0N = st0 | st1;                             // T|N
-            4'b0101: st0N = st0 ^ st1;                             // T^N
-            4'b0110: st0N = ~st0;                                  // ~T
+            5'b00000: st0N = st0;                                   // T
+            5'b00001: st0N = st1;                                   // N
+            5'b00010: st0N = st0 + st1;                             // T+N
+            5'b00011: st0N = st0 & st1;                             // T&N
+            5'b00100: st0N = st0 | st1;                             // T|N
+            5'b00101: st0N = st0 ^ st1;                             // T^N
+            5'b00110: st0N = ~st0;                                  // ~T
 
-            4'b0111: st0N = {`DWIDTH{equal}};                      // N=T
-            4'b1000: st0N = {`DWIDTH{more}};                       // N<T
+            5'b00111: st0N = {`DWIDTH{equal}};                      // N=T
+            5'b01000: st0N = {`DWIDTH{more}};                       // N<T
 
-            4'b1001: st0N = {st0[`DWIDTH-1], st0[`DWIDTH-1:1]};    // T>>1 (a)
-            4'b1010: st0N = st0 - 1;                               // T-1
-            4'b1011: st0N = rst0;                                  // R
-            4'b1100: st0N = din;                                   // [T]
-            4'b1101: st0N = {st0[`DWIDTH-2:0], 1'b0};              // T<<1
-            4'b1110: st0N = {3'b0, depth, 3'b0, rdepth};           // debug
-            4'b1111: st0N = {`DWIDTH{umore}};                      // u<
+            5'b01001: st0N = {st0[`DWIDTH-1], st0[`DWIDTH-1:1]};    // T>>1 (a)
+            5'b01010: st0N = st0 - 1;                               // T-1
+            5'b01011: st0N = rst0;                                  // R
+            5'b01100: st0N = din;                                   // [T]
+            5'b01101: st0N = {st0[`DWIDTH-2:0], 1'b0};              // T<<1
+            5'b01110: st0N = {3'b0, depth, 3'b0, rdepth};           // debug
+            5'b01111: st0N = {`DWIDTH{umore}};                      // u<
             default:  st0N = st0;                                   // NOTREACHED
         endcase
     end
@@ -224,8 +219,6 @@ always @* begin                                 // stacks, pc
         {dpop, dpush} = insn[1:0];              // out of the instruction
     else if (is_branch | is_call)               // jump, call
         {dpop, dpush} = 2'b00;
-    else if (is_special)
-        {dpop, dpush} = 2'b00;                  // nothing
     else
         {dpop, dpush} = 2'b00;                  // NOTREACHED
 
